@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ABH Dashboard</title>
+  </head>
+
+  <body>
+    <h1>ABH WhatsApp Dashboard</h1>
+
+    <input id="to" placeholder="رقم العميل مثال: 9665XXXXXXXX" />
+    <br /><br />
+
+    <input id="name" placeholder="اسم العميل مثال: أحمد" />
+    <br /><br />
+
+    <button onclick="sendTemplate()">Send Template</button>
+
+    <p id="status"></p>
+
+    <script>
+      async function sendTemplate() {
+        const to = document.getElementById("to").value.trim();
+        const name = document.getElementById("name").value.trim();
+        const status = document.getElementById("status");
+
+        status.innerText = "Sending...";
+
+        const res = await fetch("http://localhost:3000/send-template", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to,
+            name,
+          }),
+        });
+
+        const data = await res.json();
+
+        console.log(data);
+
+        if (res.ok) {
+          status.innerText = "✅ Template sent successfully";
+        } else {
+          status.innerText = "❌ Error: " + JSON.stringify(data);
+        }
+      }
+    </script>
+  </body>
+</html>
