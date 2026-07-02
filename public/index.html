@@ -1,36 +1,241 @@
 <!doctype html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ABH Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --charcoal: #14171c;
+        --panel: #1c2129;
+        --panel-border: #2a303b;
+        --steel: #8a94a3;
+        --amber: #f5a623;
+        --amber-dim: #b97b1a;
+        --text: #eef1f5;
+        --success: #3ecf8e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(
+          circle at 50% 0%,
+          #1b2028 0%,
+          var(--charcoal) 55%
+        );
+        color: var(--text);
+        font-family: "Tajawal", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      header {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 20px 28px;
+        border-bottom: 1px solid var(--panel-border);
+        background: linear-gradient(180deg, #191d24 0%, transparent 100%);
+      }
+
+      header .logo {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: linear-gradient(145deg, var(--amber), var(--amber-dim));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: 900;
+        color: #1a1300;
+        box-shadow:
+          0 0 0 4px #1c2129,
+          0 0 0 5px var(--panel-border),
+          0 8px 24px rgba(245, 166, 35, 0.25);
+      }
+      /* replace .logo content or swap for <img src="your-logo.png"> */
+
+      header h1 {
+        margin: 18px 0 4px;
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+      }
+
+      header .subtitle {
+        margin: 0;
+        color: var(--steel);
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      main {
+        flex: 1;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        padding: 40px 20px;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 460px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 28px 24px 32px;
+        box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+      }
+
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--steel);
+        margin-bottom: 8px;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        background: #10141a;
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 14px;
+        padding: 12px 14px;
+        resize: vertical;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      textarea:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--amber);
+        box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18);
+      }
+
+      textarea::placeholder,
+      input::placeholder {
+        color: #56606f;
+      }
+
+      .field {
+        margin-bottom: 20px;
+      }
+
+      button {
+        width: 100%;
+        padding: 13px 16px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(180deg, var(--amber), var(--amber-dim));
+        color: #1a1300;
+        font-family: inherit;
+        font-size: 15px;
+        font-weight: 900;
+        cursor: pointer;
+        transition:
+          transform 0.1s ease,
+          box-shadow 0.15s ease;
+      }
+
+      button:hover {
+        box-shadow: 0 8px 20px -6px rgba(245, 166, 35, 0.5);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      #status {
+        margin: 18px 0 0;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--steel);
+        min-height: 20px;
+      }
+
+      footer {
+        width: 100%;
+        padding: 20px;
+        text-align: center;
+        border-top: 1px solid var(--panel-border);
+        color: var(--steel);
+        font-size: 12px;
+      }
+
+      footer strong {
+        color: var(--amber);
+      }
+
+      @media (max-width: 480px) {
+        header .logo {
+          width: 64px;
+          height: 64px;
+          font-size: 24px;
+        }
+        header h1 {
+          font-size: 20px;
+        }
+      }
+    </style>
   </head>
-
   <body>
-    <h1>ABH WhatsApp Dashboard</h1>
+    <header>
+      <div class="logo">ABH</div>
+      <!-- To use an image instead: <img src="logo.png" alt="ABH Auto" style="width:76px;height:76px;border-radius:50%;object-fit:cover;" /> -->
+      <h1>ABH WhatsApp Dashboard</h1>
+      <p class="subtitle">مركز عناية السيارات — جدة</p>
+    </header>
 
-    <textarea
-      id="to"
-      placeholder="اكتب الأرقام هنا — كل رقم بسطر"
-      rows="10"
-      cols="35"
-    ></textarea>
-    <br /><br />
+    <main>
+      <div class="card">
+        <div class="field">
+          <label for="to">أرقام العملاء</label>
+          <textarea
+            id="to"
+            placeholder="اكتب الأرقام هنا — كل رقم بسطر"
+            rows="10"
+          ></textarea>
+        </div>
 
-    <input id="name" placeholder="اسم العميل مثال: أحمد" />
-    <br /><br />
+        <div class="field">
+          <label for="name">اسم العميل</label>
+          <input id="name" placeholder="مثال: أحمد" />
+        </div>
 
-    <button onclick="sendTemplate()">Send Template</button>
+        <button onclick="sendTemplate()">إرسال القالب</button>
+        <p id="status"></p>
+      </div>
+    </main>
 
-    <p id="status"></p>
+    <footer>&copy; 2026 <strong>ABH Auto</strong> — جميع الحقوق محفوظة</footer>
 
     <script>
       async function sendTemplate() {
         const to = document.getElementById("to").value.trim();
         const name = document.getElementById("name").value.trim();
         const status = document.getElementById("status");
-
         status.innerText = "Sending...";
-
         const res = await fetch("/send-template", {
           method: "POST",
           headers: {
@@ -41,11 +246,8 @@
             name,
           }),
         });
-
         const data = await res.json();
-
         console.log(data);
-
         if (res.ok) {
           status.innerText = `✅ Sent: ${data.sent} / ${data.total}`;
         } else {
