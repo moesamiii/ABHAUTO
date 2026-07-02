@@ -40,6 +40,17 @@ app.post("/send-template", async (req, res) => {
         },
         components: [
           {
+            type: "header",
+            parameters: [
+              {
+                type: "image",
+                image: {
+                  link: "https://abhauto.vercel.app/offer1.jpeg",
+                },
+              },
+            ],
+          },
+          {
             type: "body",
             parameters: [
               {
@@ -66,7 +77,7 @@ app.post("/send-template", async (req, res) => {
 
     const data = await response.json();
 
-    console.log("Meta response:", data);
+    console.log("Meta response:", JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       return res.status(400).json({
