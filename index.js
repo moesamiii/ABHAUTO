@@ -66,25 +66,25 @@ app.post("/send-template", async (req, res) => {
     for (const phone of finalNumbers) {
       const cleanPhone = phone.replace("+", "").replace(/\s/g, "");
 
-      // 1) Send Meta hello_world template first
-      const helloPayload = {
+      // 1) Send first approved utility template
+      const firstPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
         type: "template",
         template: {
-          name: "hello_world",
+          name: "3p_direct_integratior",
           language: {
             code: "en_US",
           },
         },
       };
 
-      const helloResult = await sendWhatsAppMessage(helloPayload);
+      const firstResult = await sendWhatsAppMessage(firstPayload);
 
       console.log(
-        "Hello template response for",
+        "First template response for",
         cleanPhone,
-        JSON.stringify(helloResult.data, null, 2),
+        JSON.stringify(firstResult.data, null, 2),
       );
 
       // 2) Wait 3 seconds
@@ -135,10 +135,10 @@ app.post("/send-template", async (req, res) => {
 
       results.push({
         to: cleanPhone,
-        helloSuccess: helloResult.ok,
+        firstSuccess: firstResult.ok,
         offerSuccess: offerResult.ok,
-        success: helloResult.ok && offerResult.ok,
-        helloData: helloResult.data,
+        success: firstResult.ok && offerResult.ok,
+        firstData: firstResult.data,
         offerData: offerResult.data,
       });
     }
