@@ -8,7 +8,12 @@
   <body>
     <h1>ABH WhatsApp Dashboard</h1>
 
-    <input id="to" placeholder="رقم العميل مثال: 9665XXXXXXXX" />
+    <textarea
+      id="to"
+      placeholder="اكتب الأرقام هنا — كل رقم بسطر"
+      rows="10"
+      cols="35"
+    ></textarea>
     <br /><br />
 
     <input id="name" placeholder="اسم العميل مثال: أحمد" />
@@ -26,7 +31,7 @@
 
         status.innerText = "Sending...";
 
-        const res = await fetch("/api/send-template", {
+        const res = await fetch("/send-template", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -42,7 +47,7 @@
         console.log(data);
 
         if (res.ok) {
-          status.innerText = "✅ Template sent successfully";
+          status.innerText = `✅ Sent: ${data.sent} / ${data.total}`;
         } else {
           status.innerText = "❌ Error: " + JSON.stringify(data);
         }
