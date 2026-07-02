@@ -66,23 +66,20 @@ app.post("/send-template", async (req, res) => {
     for (const phone of finalNumbers) {
       const cleanPhone = phone.replace("+", "").replace(/\s/g, "");
 
-      // 1) Send first approved utility template
+      // 1) Send normal text first
       const firstPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
-        type: "template",
-        template: {
-          name: "3p_direct_integratior",
-          language: {
-            code: "en_US",
-          },
+        type: "text",
+        text: {
+          body: "مرحباً 👋",
         },
       };
 
       const firstResult = await sendWhatsAppMessage(firstPayload);
 
       console.log(
-        "First template response for",
+        "First text response for",
         cleanPhone,
         JSON.stringify(firstResult.data, null, 2),
       );
@@ -90,7 +87,7 @@ app.post("/send-template", async (req, res) => {
       // 2) Wait 3 seconds
       await delay(3000);
 
-      // 3) Send your offer image template
+      // 3) Send offer image template
       const offerPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
@@ -137,7 +134,7 @@ app.post("/send-template", async (req, res) => {
         to: cleanPhone,
         firstSuccess: firstResult.ok,
         offerSuccess: offerResult.ok,
-        success: firstResult.ok && offerResult.ok,
+        success: offerResult.ok,
         firstData: firstResult.data,
         offerData: offerResult.data,
       });
@@ -146,8 +143,8 @@ app.post("/send-template", async (req, res) => {
     res.json({
       success: true,
       total: finalNumbers.length,
-      sent: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success).length,
+      sent: results.filter((r) => r.offerSuccess).length,
+      failed: results.filter((r) => !r.offerSuccess).length,
       results,
     });
   } catch (error) {
