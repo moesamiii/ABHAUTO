@@ -66,15 +66,15 @@ app.post("/send-template", async (req, res) => {
     for (const phone of finalNumbers) {
       const cleanPhone = phone.replace("+", "").replace(/\s/g, "");
 
-      // 1) Send first text template: مرحبا
+      // 1) Send Meta hello_world template first
       const helloPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
         type: "template",
         template: {
-          name: "abh_auto_hello_v1",
+          name: "hello_world",
           language: {
-            code: "ar",
+            code: "en_US",
           },
         },
       };
@@ -82,7 +82,7 @@ app.post("/send-template", async (req, res) => {
       const helloResult = await sendWhatsAppMessage(helloPayload);
 
       console.log(
-        "Hello response for",
+        "Hello template response for",
         cleanPhone,
         JSON.stringify(helloResult.data, null, 2),
       );
@@ -90,7 +90,7 @@ app.post("/send-template", async (req, res) => {
       // 2) Wait 3 seconds
       await delay(3000);
 
-      // 3) Send image offer template
+      // 3) Send your offer image template
       const offerPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
