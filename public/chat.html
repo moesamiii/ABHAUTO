@@ -12,55 +12,48 @@
         background: #14171c;
         color: white;
       }
-
       .layout {
         display: grid;
         grid-template-columns: 320px 1fr;
         height: 100vh;
       }
-
       .sidebar {
         background: #1c2129;
         border-left: 1px solid #2a303b;
         padding: 16px;
+        overflow-y: auto;
       }
-
       .chat {
         display: flex;
         flex-direction: column;
       }
-
       .chat-header {
         padding: 16px;
         background: #1c2129;
         border-bottom: 1px solid #2a303b;
         font-weight: bold;
       }
-
       .messages {
         flex: 1;
         padding: 20px;
         overflow-y: auto;
       }
-
       .message {
         max-width: 60%;
         padding: 10px 14px;
         border-radius: 12px;
         margin-bottom: 10px;
+        word-break: break-word;
       }
-
       .incoming {
         background: #2a303b;
         margin-left: auto;
       }
-
       .outgoing {
         background: #f5a623;
         color: #111;
         margin-right: auto;
       }
-
       .reply-box {
         display: flex;
         gap: 10px;
@@ -68,7 +61,6 @@
         background: #1c2129;
         border-top: 1px solid #2a303b;
       }
-
       input {
         flex: 1;
         padding: 12px;
@@ -77,7 +69,6 @@
         background: #10141a;
         color: white;
       }
-
       button {
         padding: 12px 18px;
         border: none;
@@ -86,10 +77,25 @@
         font-weight: bold;
         cursor: pointer;
       }
-
       .back {
         margin-bottom: 16px;
         width: 100%;
+      }
+      .conversation {
+        padding: 12px;
+        border-bottom: 1px solid #2a303b;
+        cursor: pointer;
+      }
+      .conversation:hover {
+        background: #2a303b;
+      }
+      .phone {
+        font-weight: bold;
+      }
+      .last {
+        color: #bbb;
+        font-size: 13px;
+        margin-top: 5px;
       }
     </style>
   </head>
@@ -99,16 +105,13 @@
       <aside class="sidebar">
         <button class="back" onclick="window.location.href = '/'">رجوع</button>
         <h3>المحادثات</h3>
-
-        <div id="conversations">لا يوجد محادثات حالياً</div>
+        <div id="conversations">Loading...</div>
       </aside>
 
       <section class="chat">
         <div class="chat-header" id="chatTitle">اختر محادثة</div>
-
         <div class="messages" id="messages">
           <div class="message incoming">هنا ستظهر رسائل العملاء</div>
-          <div class="message outgoing">وهنا ردودك من الداشبورد</div>
         </div>
 
         <div class="reply-box">
@@ -119,13 +122,75 @@
     </div>
 
     <script>
-      async function sendReply() {
-        const replyText = document.getElementById("replyText").value.trim();
+      let selectedPhone = null;
 
+      async function loadConversations() {
+        const box = document.getElementById("conversations");
+
+        try {
+          const res = await fetch("/api/get-conversations");
+          const data = await res.json();
+
+          if (!data.success || !data.conversations.length) {
+            box.innerHTML = "لا يوجد محادثات حالياً";
+            return;
+          }
+
+          box.innerHTML = data.conversations
+            .map(
+              (c) => `
+          <div class="conversation" onclick="openChat('${c.phone}')">
+            <div class="phone">${c.phone}</div>
+            <div class="last">${c.last_message || ""}</div>
+          </div>
+        `,
+            )
+            .join("");
+        } catch (err) {
+          box.innerHTML = "حدث خطأ في تحميل المحادثات";
+        }
+      }
+
+      async function openChat(phone) {
+        selectedPhone = phone;
+        document.getElementById("chatTitle").innerText = phone;
+
+        const messagesBox = document.getElementById("messages");
+        messagesBox.innerHTML = "Loading...";
+
+        const res = await fetch(`/api/get-messages?phone=${phone}`);
+        const data = await res.json();
+
+        if (!data.success || !data.messages.length) {
+          messagesBox.innerHTML =
+            "<div class='message incoming'>لا توجد رسائل</div>";
+          return;
+        }
+
+        messagesBox.innerHTML = data.messages
+          .map(
+            (m) => `
+        <div class="message ${m.direction === "incoming" ? "incoming" : "outgoing"}">
+          ${m.message || ""}
+        </div>
+      `,
+          )
+          .join("");
+
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+      }
+
+      async function sendReply() {
+        if (!selectedPhone) return alert("اختر محادثة أولاً");
+
+        const replyText = document.getElementById("replyText").value.trim();
         if (!replyText) return alert("اكتب رسالة أولاً");
 
-        alert("الخطوة الجاية بنربط هذا الزر مع WhatsApp API");
+        alert("بعدها نربط الإرسال مع WhatsApp API");
       }
+
+      loadConversations();
+      setInterval(loadConversations, 5000);
     </script>
   </body>
 </html>
