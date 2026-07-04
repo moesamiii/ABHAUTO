@@ -4,21 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ABH Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap"
       rel="stylesheet"
     />
+
     <style>
       :root {
-        --charcoal: #14171c;
-        --panel: #1c2129;
-        --panel-border: #2a303b;
-        --steel: #8a94a3;
-        --amber: #f5a623;
-        --amber-dim: #b97b1a;
+        --bg: #111418;
+        --card: #1c2129;
+        --border: #2a303b;
         --text: #eef1f5;
+        --muted: #8a94a3;
+        --gold: #f5a623;
+        --gold-dark: #b97b1a;
+        --danger: #ff5c5c;
         --success: #3ecf8e;
       }
 
@@ -29,208 +34,208 @@
       body {
         margin: 0;
         min-height: 100vh;
-        background: radial-gradient(
-          circle at 50% 0%,
-          #1b2028 0%,
-          var(--charcoal) 55%
-        );
+        background: radial-gradient(circle at top, #202630, var(--bg) 60%);
         color: var(--text);
         font-family: "Tajawal", sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
       }
 
       header {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 40px 20px 28px;
-        border-bottom: 1px solid var(--panel-border);
-        background: linear-gradient(180deg, #191d24 0%, transparent 100%);
+        text-align: center;
+        padding: 35px 20px 25px;
+        border-bottom: 1px solid var(--border);
       }
 
-      header .logo {
+      .logo {
         width: 76px;
         height: 76px;
+        margin: auto;
         border-radius: 50%;
-        background: linear-gradient(145deg, var(--amber), var(--amber-dim));
+        background: linear-gradient(145deg, var(--gold), var(--gold-dark));
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 30px;
-        font-weight: 900;
         color: #1a1300;
-        box-shadow:
-          0 0 0 4px #1c2129,
-          0 0 0 5px var(--panel-border),
-          0 8px 24px rgba(245, 166, 35, 0.25);
-      }
-      /* replace .logo content or swap for <img src="your-logo.png"> */
-
-      header h1 {
-        margin: 18px 0 4px;
-        font-size: 24px;
         font-weight: 900;
-        letter-spacing: 0.5px;
+        font-size: 28px;
       }
 
-      header .subtitle {
+      h1 {
+        margin: 16px 0 4px;
+        font-size: 24px;
+      }
+      .subtitle {
+        color: var(--muted);
         margin: 0;
-        color: var(--steel);
-        font-size: 14px;
-        font-weight: 500;
       }
 
       main {
-        flex: 1;
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        padding: 40px 20px;
+        max-width: 950px;
+        margin: auto;
+        padding: 35px 18px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
       }
 
       .card {
-        width: 100%;
-        max-width: 460px;
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
-        border-radius: 16px;
-        padding: 28px 24px 32px;
-        box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
       }
 
       label {
         display: block;
-        font-size: 13px;
-        font-weight: 700;
-        color: var(--steel);
         margin-bottom: 8px;
+        color: var(--muted);
+        font-weight: 700;
+        font-size: 14px;
       }
 
-      textarea,
       input {
         width: 100%;
-        background: #10141a;
-        border: 1px solid var(--panel-border);
+        padding: 13px 14px;
         border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #10141a;
         color: var(--text);
         font-family: inherit;
-        font-size: 14px;
-        padding: 12px 14px;
-        resize: vertical;
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+        margin-bottom: 14px;
       }
 
-      textarea:focus,
       input:focus {
         outline: none;
-        border-color: var(--amber);
-        box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.18);
-      }
-
-      textarea::placeholder,
-      input::placeholder {
-        color: #56606f;
-      }
-
-      .field {
-        margin-bottom: 20px;
+        border-color: var(--gold);
+        box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.15);
       }
 
       button {
         width: 100%;
-        padding: 13px 16px;
-        border: none;
+        padding: 13px;
+        border: 0;
         border-radius: 10px;
-        background: linear-gradient(180deg, var(--amber), var(--amber-dim));
-        color: #1a1300;
         font-family: inherit;
-        font-size: 15px;
         font-weight: 900;
         cursor: pointer;
-        transition:
-          transform 0.1s ease,
-          box-shadow 0.15s ease;
+        background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+        color: #1a1300;
+        margin-top: 8px;
       }
 
-      button:hover {
-        box-shadow: 0 8px 20px -6px rgba(245, 166, 35, 0.5);
+      .secondary {
+        background: #10141a;
+        color: var(--text);
+        border: 1px solid var(--border);
       }
 
-      button:active {
-        transform: translateY(1px);
+      .danger {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid rgba(255, 92, 92, 0.4);
       }
 
-      #status {
-        margin: 18px 0 0;
-        text-align: center;
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--steel);
-        min-height: 20px;
+      .contact {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 10px;
+        background: #141922;
+        direction: ltr;
       }
 
-      footer {
-        width: 100%;
-        padding: 20px;
-        text-align: center;
-        border-top: 1px solid var(--panel-border);
-        color: var(--steel);
+      .contact strong {
+        color: var(--gold);
+      }
+
+      .contact button {
+        width: auto;
+        padding: 6px 10px;
+        margin: 0;
         font-size: 12px;
       }
 
-      footer strong {
-        color: var(--amber);
+      #contactsList {
+        max-height: 380px;
+        overflow-y: auto;
+        margin-top: 15px;
       }
 
-      @media (max-width: 480px) {
-        header .logo {
-          width: 64px;
-          height: 64px;
-          font-size: 24px;
-        }
-        header h1 {
-          font-size: 20px;
+      #status {
+        margin-top: 15px;
+        text-align: center;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      footer {
+        text-align: center;
+        padding: 20px;
+        color: var(--muted);
+        border-top: 1px solid var(--border);
+      }
+
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
         }
       }
     </style>
   </head>
+
   <body>
     <header>
       <div class="logo">ABH</div>
-      <!-- To use an image instead: <img src="logo.png" alt="ABH Auto" style="width:76px;height:76px;border-radius:50%;object-fit:cover;" /> -->
       <h1>ABH WhatsApp Dashboard</h1>
       <p class="subtitle">مركز عناية السيارات — جدة</p>
     </header>
 
     <main>
       <div class="card">
-        <div class="field">
-          <label for="to">أرقام العملاء</label>
-          <textarea
-            id="to"
-            placeholder="اكتب الأرقام هنا — كل رقم بسطر"
-            rows="10"
-          ></textarea>
-        </div>
+        <h2>إضافة عميل</h2>
 
-        <div class="field">
-          <label for="name">اسم العميل</label>
-          <input id="name" placeholder="مثال: أحمد" />
-        </div>
+        <label>اسم العميل</label>
+        <input id="name" placeholder="مثال: أحمد" />
 
-        <button onclick="sendTemplate()">إرسال القالب</button>
+        <label>رقم العميل</label>
+        <input id="phone" placeholder="مثال: 9665XXXXXXXX" />
 
-        <button
-          onclick="window.location.href = '/chat.html'"
-          style="margin-top: 12px"
-        >
+        <button onclick="addContact()">إضافة الرقم</button>
+
+        <hr
+          style="border: 0; border-top: 1px solid var(--border); margin: 22px 0"
+        />
+
+        <label>استيراد من Excel</label>
+        <input
+          type="file"
+          id="excelFile"
+          accept=".xlsx,.xls,.csv"
+          onchange="importExcel(event)"
+        />
+
+        <p style="color: var(--muted); font-size: 13px">
+          لازم يكون ملف الإكسل فيه أعمدة باسم:
+          <br />
+          <strong>name</strong> و <strong>number</strong>
+        </p>
+
+        <button class="secondary" onclick="window.location.href = '/chat.html'">
           فتح المحادثات
         </button>
+      </div>
+
+      <div class="card">
+        <h2>قائمة الإرسال</h2>
+
+        <div id="contactsList"></div>
+
+        <button onclick="sendAll()">إرسال للجميع</button>
+        <button class="danger" onclick="clearContacts()">مسح القائمة</button>
+
         <p id="status"></p>
       </div>
     </main>
@@ -238,29 +243,130 @@
     <footer>&copy; 2026 <strong>ABH Auto</strong> — جميع الحقوق محفوظة</footer>
 
     <script>
-      async function sendTemplate() {
-        const to = document.getElementById("to").value.trim();
+      let contacts = [];
+
+      function cleanPhone(phone) {
+        return String(phone || "").replace(/\D/g, "");
+      }
+
+      function addContact() {
         const name = document.getElementById("name").value.trim();
-        const status = document.getElementById("status");
-        status.innerText = "Sending...";
-        const res = await fetch("/send-template", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            to,
-            name,
-          }),
+        const phone = cleanPhone(document.getElementById("phone").value);
+
+        if (!phone) {
+          alert("اكتب رقم العميل");
+          return;
+        }
+
+        contacts.push({
+          name: name || "عميلنا العزيز",
+          phone,
         });
-        const data = await res.json();
-        console.log(data);
-        if (res.ok) {
-          status.innerText = `✅ Sent: ${data.sent} / ${data.total}`;
-        } else {
-          status.innerText = "❌ Error: " + JSON.stringify(data);
+
+        document.getElementById("name").value = "";
+        document.getElementById("phone").value = "";
+
+        renderContacts();
+      }
+
+      function renderContacts() {
+        const list = document.getElementById("contactsList");
+
+        if (contacts.length === 0) {
+          list.innerHTML = `<p style="color:#8a94a3;text-align:center;">لا يوجد أرقام بعد</p>`;
+          return;
+        }
+
+        list.innerHTML = contacts
+          .map(
+            (c, index) => `
+        <div class="contact">
+          <div>
+            <strong>${c.name}</strong><br />
+            ${c.phone}
+          </div>
+          <button class="danger" onclick="removeContact(${index})">حذف</button>
+        </div>
+      `,
+          )
+          .join("");
+      }
+
+      function removeContact(index) {
+        contacts.splice(index, 1);
+        renderContacts();
+      }
+
+      function clearContacts() {
+        contacts = [];
+        renderContacts();
+        document.getElementById("status").innerText = "";
+      }
+
+      async function importExcel(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+
+        rows.forEach((row) => {
+          const name = row.name || row.Name || row["الاسم"] || "عميلنا العزيز";
+          const phone = cleanPhone(
+            row.number || row.Number || row.phone || row.Phone || row["الرقم"],
+          );
+
+          if (phone) {
+            contacts.push({ name, phone });
+          }
+        });
+
+        renderContacts();
+        alert("تم استيراد الأرقام بنجاح");
+      }
+
+      async function sendAll() {
+        const status = document.getElementById("status");
+
+        if (contacts.length === 0) {
+          alert("أضف أرقام أولاً");
+          return;
+        }
+
+        let sent = 0;
+        let failed = 0;
+
+        status.innerText = "جاري الإرسال...";
+
+        for (const contact of contacts) {
+          try {
+            const res = await fetch("/send-template", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                to: contact.phone,
+                name: contact.name,
+              }),
+            });
+
+            if (res.ok) {
+              sent++;
+            } else {
+              failed++;
+            }
+          } catch (err) {
+            failed++;
+          }
+
+          status.innerText = `✅ تم الإرسال: ${sent} | ❌ فشل: ${failed}`;
         }
       }
+
+      renderContacts();
     </script>
   </body>
 </html>
