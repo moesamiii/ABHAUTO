@@ -342,7 +342,7 @@
 
         for (const contact of contacts) {
           try {
-            const res = await fetch("/send-template", {
+            const res = await fetch("/api/send-template", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
