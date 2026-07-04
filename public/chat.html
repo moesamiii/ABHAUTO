@@ -183,10 +183,33 @@
       async function sendReply() {
         if (!selectedPhone) return alert("اختر محادثة أولاً");
 
-        const replyText = document.getElementById("replyText").value.trim();
+        const input = document.getElementById("replyText");
+        const replyText = input.value.trim();
+
         if (!replyText) return alert("اكتب رسالة أولاً");
 
-        alert("بعدها نربط الإرسال مع WhatsApp API");
+        const res = await fetch("/api/send-reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: selectedPhone,
+            message: replyText,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+          alert("فشل إرسال الرسالة");
+          console.log(data);
+          return;
+        }
+
+        input.value = "";
+        openChat(selectedPhone);
+        loadConversations();
       }
 
       loadConversations();
