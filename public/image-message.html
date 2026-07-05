@@ -10,6 +10,8 @@
       rel="stylesheet"
     />
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
     <style>
       :root {
         --bg: #050505;
@@ -109,6 +111,7 @@
         color: var(--muted);
         font-weight: 700;
         margin-top: 16px;
+        white-space: pre-line;
       }
     </style>
   </head>
@@ -120,6 +123,9 @@
       <label>رقم العميل</label>
       <input id="phone" placeholder="9665XXXXXXXX" />
 
+      <label>استيراد أرقام من Excel</label>
+      <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
+
       <label>الصورة</label>
       <input type="file" id="imageFile" accept="image/*" />
 
@@ -127,6 +133,7 @@
       <textarea id="message" placeholder="اكتب النص هنا"></textarea>
 
       <button onclick="sendImage()">إرسال</button>
+      <button onclick="sendFromExcel()">إرسال للجميع من Excel</button>
       <button class="back" onclick="window.location.href = '/'">رجوع</button>
 
       <p id="status"></p>
@@ -135,6 +142,10 @@
     <script>
       function cleanPhone(phone) {
         return String(phone || "").replace(/\D/g, "");
+      }
+
+      function delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
       }
 
       function fileToBase64(file) {
@@ -151,22 +162,45 @@
           data?.meta?.error?.message || data?.error || "فشل الإرسال من واتساب";
 
         if (msg.includes("healthy ecosystem")) {
-          return "❌ واتساب رفض الإرسال لحماية جودة الحساب. المشكلة ليست من الكود، غالبًا الرقم لم يتفاعل أو لا يوجد موافقة استقبال.";
+          return "واتساب رفض الإرسال لحماية جودة الحساب";
         }
 
         if (msg.includes("undeliverable")) {
-          return "❌ الرسالة غير قابلة للتسليم. الرقم قد يكون غير صحيح، أو لا يستخدم واتساب، أو لا يستطيع استقبال الرسائل.";
+          return "الرسالة غير قابلة للتسليم";
         }
 
         if (data?.step === "upload_image") {
-          return "❌ فشل رفع الصورة إلى واتساب. جرّب صورة أصغر أو صيغة JPG/PNG.";
+          return "فشل رفع الصورة";
         }
 
         if (data?.step === "send_image") {
-          return "❌ فشل إرسال الصورة من واتساب. المشكلة من قبول واتساب للرسالة أو الرقم.";
+          return "فشل إرسال الصورة من واتساب";
         }
 
-        return "❌ فشل الإرسال: " + msg;
+        return msg;
+      }
+
+      async function sendOneImage(phone, imageBase64, file, message) {
+        const res = await fetch("/api/send-image-message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: phone,
+            message,
+            imageBase64,
+            fileName: file.name,
+            mimeType: file.type,
+          }),
+        });
+
+        const data = await res.json();
+
+        return {
+          ok: res.ok && data.success,
+          data,
+        };
       }
 
       async function sendImage() {
@@ -192,31 +226,102 @@
 
           status.innerText = "جاري الإرسال عبر واتساب...";
 
-          const res = await fetch("/api/send-image-message", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              to: phone,
-              message,
-              imageBase64,
-              fileName: file.name,
-              mimeType: file.type,
-            }),
-          });
+          const result = await sendOneImage(phone, imageBase64, file, message);
 
-          const data = await res.json();
-
-          if (res.ok && data.success) {
+          if (result.ok) {
             status.innerText =
               "✅ تم قبول الرسالة من واتساب. انتظر حالة التسليم من النظام.";
           } else {
-            status.innerText = getFriendlyError(data);
-            console.log("WhatsApp error:", data);
+            status.innerText = "❌ " + getFriendlyError(result.data);
+            console.log("WhatsApp error:", result.data);
           }
         } catch (error) {
           status.innerText = "❌ حدث خطأ في النظام: " + error.message;
+        }
+      }
+
+      async function getPhonesFromExcel(file) {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        const phones = [];
+
+        rows.forEach((row) => {
+          row.forEach((cell) => {
+            const phone = cleanPhone(cell);
+            if (phone.length >= 9) phones.push(phone);
+          });
+        });
+
+        return [...new Set(phones)];
+      }
+
+      async function sendFromExcel() {
+        const status = document.getElementById("status");
+        const excelFile = document.getElementById("excelFile").files[0];
+        const imageFile = document.getElementById("imageFile").files[0];
+        const message = document.getElementById("message").value.trim();
+
+        if (!excelFile) {
+          alert("اختر ملف Excel");
+          return;
+        }
+
+        if (!imageFile) {
+          alert("اختر صورة");
+          return;
+        }
+
+        try {
+          status.innerText = "جاري قراءة ملف Excel...";
+
+          const phones = await getPhonesFromExcel(excelFile);
+
+          if (!phones.length) {
+            status.innerText = "❌ لم يتم العثور على أرقام داخل ملف Excel";
+            return;
+          }
+
+          const imageBase64 = await fileToBase64(imageFile);
+
+          let success = 0;
+          let failed = 0;
+
+          for (let i = 0; i < phones.length; i++) {
+            const phone = phones[i];
+
+            status.innerText =
+              `جاري الإرسال...\n` +
+              `الرقم: ${phone}\n` +
+              `${i + 1} من ${phones.length}\n` +
+              `✅ نجاح: ${success} | ❌ فشل: ${failed}`;
+
+            const result = await sendOneImage(
+              phone,
+              imageBase64,
+              imageFile,
+              message,
+            );
+
+            if (result.ok) {
+              success++;
+            } else {
+              failed++;
+              console.log("Failed number:", phone, result.data);
+            }
+
+            await delay(7000);
+          }
+
+          status.innerText =
+            `انتهى الإرسال ✅\n` +
+            `تم قبول: ${success}\n` +
+            `فشل: ${failed}\n` +
+            `المجموع: ${phones.length}`;
+        } catch (error) {
+          status.innerText = "❌ حدث خطأ: " + error.message;
         }
       }
     </script>
