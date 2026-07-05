@@ -23,49 +23,68 @@ export default async function handler(req, res) {
       console.log("WEBHOOK BODY:", JSON.stringify(req.body, null, 2));
 
       const value = req.body?.entry?.[0]?.changes?.[0]?.value;
-      const message = value?.messages?.[0];
 
-      if (!message) {
-        console.log("No message found");
-        return res.status(200).json({ success: true });
+      // ✅ 1) WhatsApp delivery statuses: sent / delivered / read / failed
+      const statuses = value?.statuses || [];
+
+      for (const s of statuses) {
+        console.log("STATUS UPDATE:", JSON.stringify(s, null, 2));
+
+        const waMessageId = s.id;
+        const phone = s.recipient_id;
+        const status = s.status;
+        const errorMessage = s.errors?.[0]?.message || null;
+        const errorCode = s.errors?.[0]?.code || null;
+
+        await supabase
+          .from("messages")
+          .update({
+            status,
+            error_message: errorMessage,
+            error_code: errorCode,
+          })
+          .eq("wa_message_id", waMessageId);
+
+        await supabase.from("conversations").upsert(
+          {
+            phone,
+            last_message:
+              status === "failed"
+                ? `Message failed: ${errorMessage || errorCode}`
+                : `Message status: ${status}`,
+            last_message_at: new Date().toISOString(),
+          },
+          { onConflict: "phone" },
+        );
       }
 
-      const phone = message.from;
-      const text = message.text?.body || "";
+      // ✅ 2) Incoming customer messages
+      const messages = value?.messages || [];
 
-      const { error: msgError } = await supabase.from("messages").insert({
-        wa_message_id: message.id,
-        phone,
-        direction: "incoming",
-        message_type: message.type,
-        message: text,
-        status: "received",
-      });
+      for (const message of messages) {
+        const phone = message.from;
+        const text =
+          message.text?.body || message.image?.caption || `[${message.type}]`;
 
-      if (msgError) {
-        console.error("MESSAGES INSERT ERROR:", msgError);
-        return res
-          .status(500)
-          .json({ success: false, error: msgError.message });
-      }
-
-      const { error: convError } = await supabase.from("conversations").upsert(
-        {
+        await supabase.from("messages").insert({
+          wa_message_id: message.id,
           phone,
-          last_message: text,
-          last_message_at: new Date().toISOString(),
-        },
-        { onConflict: "phone" },
-      );
+          direction: "incoming",
+          message_type: message.type,
+          message: text,
+          status: "received",
+        });
 
-      if (convError) {
-        console.error("CONVERSATIONS UPSERT ERROR:", convError);
-        return res
-          .status(500)
-          .json({ success: false, error: convError.message });
+        await supabase.from("conversations").upsert(
+          {
+            phone,
+            last_message: text,
+            last_message_at: new Date().toISOString(),
+          },
+          { onConflict: "phone" },
+        );
       }
 
-      console.log("Message saved successfully");
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error("WEBHOOK ERROR:", error);
