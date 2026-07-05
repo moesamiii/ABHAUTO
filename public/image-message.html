@@ -146,6 +146,29 @@
         });
       }
 
+      function getFriendlyError(data) {
+        const msg =
+          data?.meta?.error?.message || data?.error || "فشل الإرسال من واتساب";
+
+        if (msg.includes("healthy ecosystem")) {
+          return "❌ واتساب رفض الإرسال لحماية جودة الحساب. المشكلة ليست من الكود، غالبًا الرقم لم يتفاعل أو لا يوجد موافقة استقبال.";
+        }
+
+        if (msg.includes("undeliverable")) {
+          return "❌ الرسالة غير قابلة للتسليم. الرقم قد يكون غير صحيح، أو لا يستخدم واتساب، أو لا يستطيع استقبال الرسائل.";
+        }
+
+        if (data?.step === "upload_image") {
+          return "❌ فشل رفع الصورة إلى واتساب. جرّب صورة أصغر أو صيغة JPG/PNG.";
+        }
+
+        if (data?.step === "send_image") {
+          return "❌ فشل إرسال الصورة من واتساب. المشكلة من قبول واتساب للرسالة أو الرقم.";
+        }
+
+        return "❌ فشل الإرسال: " + msg;
+      }
+
       async function sendImage() {
         const status = document.getElementById("status");
         const phone = cleanPhone(document.getElementById("phone").value);
@@ -162,50 +185,38 @@
           return;
         }
 
-        status.innerText = "جاري إرسال رسالة الترحيب...";
+        status.innerText = "جاري تجهيز الصورة...";
 
-        const helloRes = await fetch("/api/send-reply", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            to: phone,
-            message: "Hello",
-          }),
-        });
+        try {
+          const imageBase64 = await fileToBase64(file);
 
-        if (!helloRes.ok) {
-          status.innerText = "❌ فشل إرسال Hello";
-          return;
-        }
+          status.innerText = "جاري الإرسال عبر واتساب...";
 
-        status.innerText = "تم إرسال Hello ✅ — انتظار 3 ثواني...";
+          const res = await fetch("/api/send-image-message", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: phone,
+              message,
+              imageBase64,
+              fileName: file.name,
+              mimeType: file.type,
+            }),
+          });
 
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+          const data = await res.json();
 
-        status.innerText = "جاري إرسال الصورة...";
-
-        const imageBase64 = await fileToBase64(file);
-
-        const res = await fetch("/api/send-image-message", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            to: phone,
-            message,
-            imageBase64,
-            fileName: file.name,
-            mimeType: file.type,
-          }),
-        });
-
-        if (res.ok) {
-          status.innerText = "✅ تم إرسال الصورة بنجاح";
-        } else {
-          status.innerText = "❌ فشل الإرسال";
+          if (res.ok && data.success) {
+            status.innerText =
+              "✅ تم قبول الرسالة من واتساب. انتظر حالة التسليم من النظام.";
+          } else {
+            status.innerText = getFriendlyError(data);
+            console.log("WhatsApp error:", data);
+          }
+        } catch (error) {
+          status.innerText = "❌ حدث خطأ في النظام: " + error.message;
         }
       }
     </script>

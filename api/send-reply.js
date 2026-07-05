@@ -5,6 +5,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
+function cleanPhone(phone) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+function getMetaError(data) {
+  return data?.error?.message || data?.error || "WhatsApp API error";
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res
@@ -13,12 +21,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, message } = req.body;
+    const phone = cleanPhone(req.body.to);
+    const message = String(req.body.message || "").trim();
 
-    if (!to || !message) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Missing to or message" });
+    if (!phone || !message) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing phone or message",
+      });
     }
 
     const response = await fetch(
@@ -31,11 +41,9 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
-          to,
+          to: phone,
           type: "text",
-          text: {
-            body: message,
-          },
+          text: { body: message },
         }),
       },
     );
@@ -43,29 +51,52 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(500).json({ success: false, error: data });
+      await supabase.from("messages").insert({
+        wa_message_id: null,
+        phone,
+        direction: "outgoing",
+        message_type: "text",
+        message,
+        status: "failed",
+        error: JSON.stringify(data),
+      });
+
+      return res.status(400).json({
+        success: false,
+        step: "send_text",
+        error: getMetaError(data),
+        meta: data,
+      });
     }
 
     await supabase.from("messages").insert({
-      wa_message_id: data.messages?.[0]?.id,
-      phone: to,
+      wa_message_id: data.messages?.[0]?.id || null,
+      phone,
       direction: "outgoing",
       message_type: "text",
       message,
-      status: "sent",
+      status: "accepted",
     });
 
     await supabase.from("conversations").upsert(
       {
-        phone: to,
+        phone,
         last_message: message,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
     );
 
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({
+      success: true,
+      message: "Message accepted by WhatsApp",
+      data,
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      step: "server_error",
+      error: error.message,
+    });
   }
 }

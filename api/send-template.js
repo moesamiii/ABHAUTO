@@ -1,8 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
+function cleanPhone(phone) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+function getMetaError(data) {
+  return data?.error?.message || "WhatsApp rejected the template message";
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res
+      .status(405)
+      .json({ success: false, error: "Method not allowed" });
   }
 
   try {
@@ -18,14 +28,12 @@ export default async function handler(req, res) {
       process.env.SUPABASE_SERVICE_ROLE_KEY,
     );
 
-    const { to, name } = req.body;
-    const phone = String(to || "").replace(/\D/g, "");
+    const phone = cleanPhone(req.body.to);
+    const customerName = String(req.body.name || "عميلنا العزيز").trim();
 
     if (!phone) {
       return res.status(400).json({ success: false, error: "Phone required" });
     }
-
-    const customerName = name || "عميلنا العزيز";
 
     const payload = {
       messaging_product: "whatsapp",
@@ -69,7 +77,25 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(400).json({ success: false, meta: data });
+      const errorMessage = getMetaError(data);
+
+      await supabase.from("messages").insert({
+        wa_message_id: null,
+        phone,
+        direction: "outgoing",
+        message_type: "template",
+        message: `Template failed to ${customerName}`,
+        status: "failed",
+        error_message: errorMessage,
+        error_code: data?.error?.code || null,
+      });
+
+      return res.status(400).json({
+        success: false,
+        step: "send_template",
+        error: errorMessage,
+        meta: data,
+      });
     }
 
     await supabase.from("messages").insert({
@@ -77,25 +103,30 @@ export default async function handler(req, res) {
       phone,
       direction: "outgoing",
       message_type: "template",
-      message: `Template sent to ${customerName}`,
-      status: "sent",
+      message: `Template accepted for ${customerName}`,
+      status: "accepted",
     });
 
     await supabase.from("conversations").upsert(
       {
         phone,
         customer_name: customerName,
-        last_message: `Template sent to ${customerName}`,
+        last_message: `Template accepted for ${customerName}`,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
     );
 
-    return res.status(200).json({ success: true, data });
+    return res.status(200).json({
+      success: true,
+      message: "Template accepted by WhatsApp",
+      data,
+    });
   } catch (error) {
     console.error("SEND TEMPLATE ERROR:", error);
     return res.status(500).json({
       success: false,
+      step: "server_error",
       error: error.message,
     });
   }
