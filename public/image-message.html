@@ -140,6 +140,9 @@
     </div>
 
     <script>
+      // Policy-related error codes: never retry these, ever.
+      const POLICY_ERROR_CODES = [131047, 131049, 131026];
+
       function cleanPhone(phone) {
         return String(phone || "").replace(/\D/g, "");
       }
@@ -158,26 +161,18 @@
       }
 
       function getFriendlyError(data) {
-        const msg =
-          data?.meta?.error?.message || data?.error || "فشل الإرسال من واتساب";
+        const code = data?.meta?.error?.code;
 
-        if (msg.includes("healthy ecosystem")) {
-          return "واتساب رفض الإرسال لحماية جودة الحساب";
-        }
+        if (code === 131047) return "العميل لم يتفاعل / لا يوجد opt-in";
+        if (code === 131049) return "واتساب رفض الإرسال لحماية جودة الحساب";
+        if (code === 131026) return "الرقم غير قابل للتسليم";
 
-        if (msg.includes("undeliverable")) {
-          return "الرسالة غير قابلة للتسليم";
-        }
+        if (data?.step === "upload_image") return "فشل رفع الصورة";
+        if (data?.step === "send_image") return "فشل إرسال الصورة من واتساب";
 
-        if (data?.step === "upload_image") {
-          return "فشل رفع الصورة";
-        }
-
-        if (data?.step === "send_image") {
-          return "فشل إرسال الصورة من واتساب";
-        }
-
-        return msg;
+        return (
+          data?.error || data?.meta?.error?.message || "فشل الإرسال من واتساب"
+        );
       }
 
       async function sendOneImage(phone, imageBase64, file, message) {
@@ -288,7 +283,10 @@
 
           let success = 0;
           let failed = 0;
+          const failedDetails = [];
 
+          // One number at a time, 7s delay between sends, no retries —
+          // each number gets exactly one attempt, ever.
           for (let i = 0; i < phones.length; i++) {
             const phone = phones[i];
 
@@ -309,6 +307,8 @@
               success++;
             } else {
               failed++;
+              const reason = getFriendlyError(result.data);
+              failedDetails.push(`${phone}: ${reason}`);
               console.log("Failed number:", phone, result.data);
             }
 
@@ -319,7 +319,10 @@
             `انتهى الإرسال ✅\n` +
             `تم قبول: ${success}\n` +
             `فشل: ${failed}\n` +
-            `المجموع: ${phones.length}`;
+            `المجموع: ${phones.length}` +
+            (failedDetails.length
+              ? `\n\nالأرقام الفاشلة:\n${failedDetails.join("\n")}`
+              : "");
         } catch (error) {
           status.innerText = "❌ حدث خطأ: " + error.message;
         }

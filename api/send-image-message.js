@@ -5,6 +5,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
+function cleanPhone(phone) {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+function getMetaError(data) {
+  return data?.error?.message || "WhatsApp rejected the image message";
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res
@@ -14,12 +22,12 @@ export default async function handler(req, res) {
 
   try {
     const { to, message, imageBase64, fileName, mimeType } = req.body;
-
-    const phone = String(to || "").replace(/\D/g, "");
+    const phone = cleanPhone(to);
 
     if (!phone || !imageBase64 || !mimeType) {
       return res.status(400).json({
         success: false,
+        step: "validation",
         error: "Missing phone or image",
       });
     }
@@ -49,9 +57,24 @@ export default async function handler(req, res) {
     const uploadData = await uploadResponse.json();
 
     if (!uploadResponse.ok) {
+      const errorMessage = getMetaError(uploadData);
+      const errorCode = uploadData?.error?.code || null;
+
+      await supabase.from("messages").insert({
+        wa_message_id: null,
+        phone,
+        direction: "outgoing",
+        message_type: "system",
+        message: `Image upload failed: ${errorMessage}`,
+        status: "failed",
+        error_message: errorMessage,
+        error_code: errorCode,
+      });
+
       return res.status(400).json({
         success: false,
         step: "upload_image",
+        error: errorMessage,
         meta: uploadData,
       });
     }
@@ -81,9 +104,24 @@ export default async function handler(req, res) {
     const sendData = await sendResponse.json();
 
     if (!sendResponse.ok) {
+      const errorMessage = getMetaError(sendData);
+      const errorCode = sendData?.error?.code || null;
+
+      await supabase.from("messages").insert({
+        wa_message_id: null,
+        phone,
+        direction: "outgoing",
+        message_type: "system",
+        message: `Image send failed: ${errorMessage}`,
+        status: "failed",
+        error_message: errorMessage,
+        error_code: errorCode,
+      });
+
       return res.status(400).json({
         success: false,
         step: "send_image",
+        error: errorMessage,
         meta: sendData,
       });
     }
@@ -94,13 +132,13 @@ export default async function handler(req, res) {
       direction: "outgoing",
       message_type: "image",
       message: message || "Image sent",
-      status: "sent",
+      status: "accepted",
     });
 
     await supabase.from("conversations").upsert(
       {
         phone,
-        last_message: message || "Image sent",
+        last_message: message || "📷 صورة",
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
@@ -112,8 +150,10 @@ export default async function handler(req, res) {
       data: sendData,
     });
   } catch (error) {
+    console.error("SEND IMAGE ERROR:", error);
     return res.status(500).json({
       success: false,
+      step: "server_error",
       error: error.message,
     });
   }

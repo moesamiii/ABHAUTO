@@ -8,6 +8,11 @@ function getMetaError(data) {
   return data?.error?.message || "WhatsApp rejected the template message";
 }
 
+// Real customer-facing text of the template body (used so the chat bubble
+// shows actual content the customer received, not an internal admin note)
+const TEMPLATE_CUSTOMER_TEXT =
+  "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res
@@ -78,16 +83,19 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errorMessage = getMetaError(data);
+      const errorCode = data?.error?.code || null;
 
+      // Logged as "system" so it never renders as a chat bubble,
+      // but is still tracked in the messages table for reporting.
       await supabase.from("messages").insert({
         wa_message_id: null,
         phone,
         direction: "outgoing",
-        message_type: "template",
-        message: `Template failed to ${customerName}`,
+        message_type: "system",
+        message: `Template failed: ${errorMessage}`,
         status: "failed",
         error_message: errorMessage,
-        error_code: data?.error?.code || null,
+        error_code: errorCode,
       });
 
       return res.status(400).json({
@@ -98,12 +106,13 @@ export default async function handler(req, res) {
       });
     }
 
+    // Store the REAL customer-facing content, not an internal note
     await supabase.from("messages").insert({
       wa_message_id: data.messages?.[0]?.id || null,
       phone,
       direction: "outgoing",
       message_type: "template",
-      message: `Template accepted for ${customerName}`,
+      message: TEMPLATE_CUSTOMER_TEXT,
       status: "accepted",
     });
 
@@ -111,7 +120,7 @@ export default async function handler(req, res) {
       {
         phone,
         customer_name: customerName,
-        last_message: `Template accepted for ${customerName}`,
+        last_message: TEMPLATE_CUSTOMER_TEXT,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },

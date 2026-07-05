@@ -10,7 +10,7 @@ function cleanPhone(phone) {
 }
 
 function getMetaError(data) {
-  return data?.error?.message || data?.error || "WhatsApp API error";
+  return data?.error?.message || "WhatsApp API error";
 }
 
 export default async function handler(req, res) {
@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     if (!phone || !message) {
       return res.status(400).json({
         success: false,
+        step: "validation",
         error: "Missing phone or message",
       });
     }
@@ -51,20 +52,24 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
+      const errorMessage = getMetaError(data);
+      const errorCode = data?.error?.code || null;
+
       await supabase.from("messages").insert({
         wa_message_id: null,
         phone,
         direction: "outgoing",
-        message_type: "text",
-        message,
+        message_type: "system",
+        message: `Reply failed: ${errorMessage}`,
         status: "failed",
-        error: JSON.stringify(data),
+        error_message: errorMessage,
+        error_code: errorCode,
       });
 
       return res.status(400).json({
         success: false,
         step: "send_text",
-        error: getMetaError(data),
+        error: errorMessage,
         meta: data,
       });
     }
@@ -93,6 +98,7 @@ export default async function handler(req, res) {
       data,
     });
   } catch (error) {
+    console.error("SEND REPLY ERROR:", error);
     return res.status(500).json({
       success: false,
       step: "server_error",

@@ -5,6 +5,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
+// Friendly Arabic text for the conversation list preview.
+// This NEVER gets written into the messages table as a bubble —
+// it only updates conversations.last_message.
+function getFriendlyStatusText(status, errorCode, errorMessage) {
+  if (status === "read") return "✅ مقروءة";
+  if (status === "delivered") return "✅ تم التسليم";
+  if (status === "sent") return "✅ تم الإرسال";
+
+  if (status === "failed") {
+    if (errorCode === 131047) return "❌ العميل لم يتفاعل / لا يوجد opt-in";
+    if (errorCode === 131049) return "❌ واتساب رفض الإرسال لحماية جودة الحساب";
+    if (errorCode === 131026) return "❌ الرقم غير قابل للتسليم";
+    return `❌ فشل الإرسال: ${errorMessage || "خطأ غير معروف"}`;
+  }
+
+  return status;
+}
+
 export default async function handler(req, res) {
   if (req.method === "GET") {
     const mode = req.query["hub.mode"];
@@ -36,6 +54,8 @@ export default async function handler(req, res) {
         const errorMessage = s.errors?.[0]?.message || null;
         const errorCode = s.errors?.[0]?.code || null;
 
+        // Update the existing message row only — never insert a new
+        // "chat bubble" row for a status event.
         await supabase
           .from("messages")
           .update({
@@ -45,13 +65,16 @@ export default async function handler(req, res) {
           })
           .eq("wa_message_id", waMessageId);
 
+        // Conversation list preview only — chat.html reads this for the
+        // sidebar, not for the message bubbles.
         await supabase.from("conversations").upsert(
           {
             phone,
-            last_message:
-              status === "failed"
-                ? `Message failed: ${errorMessage || errorCode}`
-                : `Message status: ${status}`,
+            last_message: getFriendlyStatusText(
+              status,
+              errorCode,
+              errorMessage,
+            ),
             last_message_at: new Date().toISOString(),
           },
           { onConflict: "phone" },

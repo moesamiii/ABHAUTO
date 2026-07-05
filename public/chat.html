@@ -184,6 +184,29 @@
     <script>
       let selectedPhone = null;
 
+      // Anything with message_type "system" is an internal log
+      // (failed sends, delivery notes) and must never render as a bubble.
+      // The text patterns below catch any legacy rows saved before this fix.
+      const SYSTEM_MESSAGE_TYPES = ["system"];
+      const SYSTEM_TEXT_PATTERNS = [
+        /^Template sent to/i,
+        /^Template accepted for/i,
+        /^Template failed/i,
+        /^Message status:/i,
+        /^Message failed:/i,
+        /^Image upload failed/i,
+        /^Image send failed/i,
+        /^Reply failed/i,
+      ];
+
+      function isSystemMessage(m) {
+        if (SYSTEM_MESSAGE_TYPES.includes(m.message_type)) return true;
+        if (m.status === "failed") return true;
+
+        const text = m.message || "";
+        return SYSTEM_TEXT_PATTERNS.some((pattern) => pattern.test(text));
+      }
+
       async function loadConversations() {
         const box = document.getElementById("conversations");
 
@@ -227,7 +250,17 @@
           return;
         }
 
-        messagesBox.innerHTML = data.messages
+        const visibleMessages = data.messages.filter(
+          (m) => !isSystemMessage(m),
+        );
+
+        if (!visibleMessages.length) {
+          messagesBox.innerHTML =
+            "<div class='message incoming'>لا توجد رسائل</div>";
+          return;
+        }
+
+        messagesBox.innerHTML = visibleMessages
           .map(
             (m) => `
         <div class="message ${m.direction === "incoming" ? "incoming" : "outgoing"}">
@@ -262,7 +295,7 @@
         const data = await res.json();
 
         if (!data.success) {
-          alert("فشل إرسال الرسالة");
+          alert("فشل إرسال الرسالة: " + (data.error || ""));
           console.log(data);
           return;
         }
