@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>إرسال صورة مع نص</title>
+  </head>
+
+  <body>
+    <h1>إرسال صورة مع نص</h1>
+
+    <label>رقم العميل</label>
+    <input id="phone" placeholder="9665XXXXXXXX" />
+
+    <br /><br />
+
+    <label>الصورة</label>
+    <input type="file" id="imageFile" accept="image/*" />
+
+    <br /><br />
+
+    <label>النص</label>
+    <textarea id="message" placeholder="اكتب النص هنا"></textarea>
+
+    <br /><br />
+
+    <button onclick="sendImage()">إرسال</button>
+    <button onclick="window.location.href = '/'">رجوع</button>
+
+    <p id="status"></p>
+
+    <script>
+      function cleanPhone(phone) {
+        return String(phone || "").replace(/\D/g, "");
+      }
+
+      function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      async function sendImage() {
+        const status = document.getElementById("status");
+        const phone = cleanPhone(document.getElementById("phone").value);
+        const file = document.getElementById("imageFile").files[0];
+        const message = document.getElementById("message").value.trim();
+
+        if (!phone) {
+          alert("اكتب رقم العميل");
+          return;
+        }
+
+        if (!file) {
+          alert("اختر صورة");
+          return;
+        }
+
+        status.innerText = "جاري الإرسال...";
+
+        const imageBase64 = await fileToBase64(file);
+
+        const res = await fetch("/api/send-image-message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: phone,
+            message,
+            imageBase64,
+            fileName: file.name,
+            mimeType: file.type,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          status.innerText = "✅ تم إرسال الصورة بنجاح";
+        } else {
+          status.innerText = "❌ فشل الإرسال";
+          console.log(data);
+        }
+      }
+    </script>
+  </body>
+</html>
