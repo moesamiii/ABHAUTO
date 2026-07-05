@@ -46,17 +46,21 @@
       }
 
       .logo {
-        width: 76px;
-        height: 76px;
+        width: 90px;
+        height: 90px;
         margin: auto;
         border-radius: 50%;
-        background: linear-gradient(145deg, var(--gold), var(--gold-dark));
+        background: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #1a1300;
-        font-weight: 900;
-        font-size: 28px;
+        overflow: hidden;
+      }
+
+      .logo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       h1 {
@@ -188,7 +192,9 @@
 
   <body>
     <header>
-      <div class="logo">ABH</div>
+      <div class="logo">
+        <img src="/logo.png" alt="ABH Logo" />
+      </div>
       <h1>ABH WhatsApp Dashboard</h1>
       <p class="subtitle">مركز عناية السيارات — جدة</p>
     </header>
