@@ -1,48 +1,3 @@
-require("dotenv").config();
-
-console.log("🚀 NEW INDEX.JS LOADED");
-
-const express = require("express");
-const path = require("path");
-
-const app = express();
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function sendWhatsAppMessage(payload) {
-  const response = await fetch(
-    `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  const data = await response.json();
-
-  return {
-    ok: response.ok,
-    data,
-  };
-}
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-app.get("/test", (req, res) => {
-  res.json({ ok: true, message: "Server route is working" });
-});
-
 app.post("/send-template", async (req, res) => {
   try {
     const { to, numbers, name } = req.body;
@@ -66,28 +21,7 @@ app.post("/send-template", async (req, res) => {
     for (const phone of finalNumbers) {
       const cleanPhone = phone.replace("+", "").replace(/\s/g, "");
 
-      // 1) Send normal text first
-      const firstPayload = {
-        messaging_product: "whatsapp",
-        to: cleanPhone,
-        type: "text",
-        text: {
-          body: "مرحباً 👋",
-        },
-      };
-
-      const firstResult = await sendWhatsAppMessage(firstPayload);
-
-      console.log(
-        "First text response for",
-        cleanPhone,
-        JSON.stringify(firstResult.data, null, 2),
-      );
-
-      // 2) Wait 3 seconds
-      await delay(3000);
-
-      // 3) Send offer image template
+      // Send ONLY the approved offer template — no text message before it
       const offerPayload = {
         messaging_product: "whatsapp",
         to: cleanPhone,
@@ -132,19 +66,19 @@ app.post("/send-template", async (req, res) => {
 
       results.push({
         to: cleanPhone,
-        firstSuccess: firstResult.ok,
-        offerSuccess: offerResult.ok,
         success: offerResult.ok,
-        firstData: firstResult.data,
         offerData: offerResult.data,
       });
+
+      // keep spacing between numbers when sending to multiple recipients
+      await delay(3000);
     }
 
     res.json({
       success: true,
       total: finalNumbers.length,
-      sent: results.filter((r) => r.offerSuccess).length,
-      failed: results.filter((r) => !r.offerSuccess).length,
+      sent: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
       results,
     });
   } catch (error) {
@@ -154,21 +88,4 @@ app.post("/send-template", async (req, res) => {
       error: error.message,
     });
   }
-});
-
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: `Route not found: ${req.method} ${req.originalUrl}`,
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("=================================");
-  console.log(`✅ Dashboard running: http://localhost:${PORT}`);
-  console.log("PHONE_NUMBER_ID:", process.env.PHONE_NUMBER_ID);
-  console.log("TOKEN EXISTS:", !!process.env.WHATSAPP_TOKEN);
-  console.log("=================================");
 });
