@@ -147,7 +147,29 @@
           return;
         }
 
-        status.innerText = "جاري الإرسال...";
+        status.innerText = "جاري إرسال رسالة الترحيب...";
+
+        const helloRes = await fetch("/api/send-reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: phone,
+            message: "Hello",
+          }),
+        });
+
+        if (!helloRes.ok) {
+          status.innerText = "❌ فشل إرسال Hello";
+          return;
+        }
+
+        status.innerText = "تم إرسال Hello ✅ — انتظار 3 ثواني...";
+
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        status.innerText = "جاري إرسال الصورة...";
 
         const imageBase64 = await fileToBase64(file);
 
