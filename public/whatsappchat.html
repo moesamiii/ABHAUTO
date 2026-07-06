@@ -184,8 +184,7 @@
         <div class="reply-box">
           <input id="imageFile" type="file" accept="image/*" />
           <input id="replyText" placeholder="اكتب الرد هنا..." />
-          <button onclick="sendImage()">إرسال صورة</button>
-          <button onclick="sendReply()">إرسال</button>
+          <button onclick="sendSmartMessage()">إرسال</button>
         </div>
       </section>
     </div>
@@ -376,6 +375,24 @@
 
         openChat(selectedPhone);
         loadConversations();
+      }
+
+      async function sendSmartMessage() {
+        const fileInput = document.getElementById("imageFile");
+        const textInput = document.getElementById("replyText");
+
+        const hasImage = fileInput.files.length > 0;
+        const hasText = textInput.value.trim().length > 0;
+
+        if (!hasImage && !hasText) {
+          return alert("اكتب رسالة أو اختر صورة أولاً");
+        }
+
+        if (hasImage) {
+          return sendImage();
+        }
+
+        return sendReply();
       }
 
       document
