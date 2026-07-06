@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ABH WhatsApp Chat</title>
+
+    <style>
+      :root {
+        --bg: #050505;
+        --card: #111111;
+        --border: #2a2a2a;
+        --text: #f5f5f5;
+        --muted: #9a9a9a;
+        --primary: #ffffff;
+        --primary-dark: #b8b8b8;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: radial-gradient(circle at top, #1a1a1a, var(--bg) 60%);
+        color: var(--text);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        height: 100vh;
+      }
+
+      .sidebar {
+        background: var(--card);
+        border-left: 1px solid var(--border);
+        padding: 16px;
+        overflow-y: auto;
+      }
+
+      .chat {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-header {
+        padding: 16px;
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        font-weight: bold;
+      }
+
+      .messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .message {
+        max-width: 60%;
+        padding: 10px 14px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        word-break: break-word;
+      }
+
+      .message-time {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: 6px;
+        text-align: left;
+      }
+
+      .incoming {
+        background: #202020;
+        color: var(--text);
+        margin-left: auto;
+        border: 1px solid var(--border);
+      }
+
+      .outgoing {
+        background: linear-gradient(
+          180deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        color: #000;
+        margin-right: auto;
+      }
+
+      .reply-box {
+        display: flex;
+        gap: 10px;
+        padding: 16px;
+        background: var(--card);
+        border-top: 1px solid var(--border);
+      }
+
+      input {
+        flex: 1;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #0d0d0d;
+        color: var(--text);
+      }
+
+      input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+      }
+
+      button {
+        padding: 12px 18px;
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(
+          180deg,
+          var(--primary),
+          var(--primary-dark)
+        );
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .conversation {
+        padding: 12px;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+
+      .conversation:hover {
+        background: #202020;
+      }
+
+      .phone {
+        font-weight: bold;
+        color: var(--text);
+      }
+
+      .last {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 5px;
+      }
+
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          height: 35vh;
+          border-left: none;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .message {
+          max-width: 85%;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h3>المحادثات</h3>
+        <div id="conversations">Loading...</div>
+      </aside>
+
+      <section class="chat">
+        <div class="chat-header" id="chatTitle">اختر محادثة</div>
+        <div class="messages" id="messages">
+          <div class="message incoming">هنا ستظهر رسائل العملاء</div>
+        </div>
+
+        <div class="reply-box">
+          <input id="replyText" placeholder="اكتب الرد هنا..." />
+          <button onclick="sendReply()">إرسال</button>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      let selectedPhone = null;
+
+      const SYSTEM_MESSAGE_TYPES = ["system"];
+      const SYSTEM_TEXT_PATTERNS = [
+        /^Template sent to/i,
+        /^Template accepted for/i,
+        /^Template failed/i,
+        /^Message status:/i,
+        /^Message failed:/i,
+        /^Image upload failed/i,
+        /^Image send failed/i,
+        /^Reply failed/i,
+      ];
+
+      function isSystemMessage(m) {
+        if (SYSTEM_MESSAGE_TYPES.includes(m.message_type)) return true;
+        if (m.status === "failed") return true;
+
+        const text = m.message || "";
+        return SYSTEM_TEXT_PATTERNS.some((pattern) => pattern.test(text));
+      }
+
+      function formatTime(dateString) {
+        if (!dateString) return "";
+
+        const date = new Date(dateString);
+
+        return date.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+
+      async function loadConversations() {
+        const box = document.getElementById("conversations");
+
+        try {
+          const res = await fetch("/api/get-conversations");
+          const data = await res.json();
+
+          if (!data.success || !data.conversations.length) {
+            box.innerHTML = "لا يوجد محادثات حالياً";
+            return;
+          }
+
+          box.innerHTML = data.conversations
+            .map(
+              (c) => `
+          <div class="conversation" onclick="openChat('${c.phone}')">
+            <div class="phone">${c.phone}</div>
+            <div class="last">${c.last_message || ""}</div>
+          </div>
+        `,
+            )
+            .join("");
+        } catch (err) {
+          box.innerHTML = "حدث خطأ في تحميل المحادثات";
+        }
+      }
+
+      async function openChat(phone) {
+        selectedPhone = phone;
+        document.getElementById("chatTitle").innerText = phone;
+
+        const messagesBox = document.getElementById("messages");
+        messagesBox.innerHTML = "Loading...";
+
+        const res = await fetch(`/api/get-messages?phone=${phone}`);
+        const data = await res.json();
+
+        if (!data.success || !data.messages.length) {
+          messagesBox.innerHTML =
+            "<div class='message incoming'>لا توجد رسائل</div>";
+          return;
+        }
+
+        const visibleMessages = data.messages.filter(
+          (m) => !isSystemMessage(m),
+        );
+
+        if (!visibleMessages.length) {
+          messagesBox.innerHTML =
+            "<div class='message incoming'>لا توجد رسائل</div>";
+          return;
+        }
+
+        messagesBox.innerHTML = visibleMessages
+          .map(
+            (m) => `
+        <div class="message ${m.direction === "incoming" ? "incoming" : "outgoing"}">
+          <div>${m.message || ""}</div>
+          <div class="message-time">
+            ${formatTime(m.created_at || m.createdAt || m.inserted_at || m.timestamp)}
+          </div>
+        </div>
+      `,
+          )
+          .join("");
+
+        messagesBox.scrollTop = messagesBox.scrollHeight;
+      }
+
+      async function sendReply() {
+        if (!selectedPhone) return alert("اختر محادثة أولاً");
+
+        const input = document.getElementById("replyText");
+        const replyText = input.value.trim();
+
+        if (!replyText) return alert("اكتب رسالة أولاً");
+
+        const res = await fetch("/api/send-reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to: selectedPhone,
+            message: replyText,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+          alert("فشل إرسال الرسالة: " + (data.error || ""));
+          console.log(data);
+          return;
+        }
+
+        input.value = "";
+        openChat(selectedPhone);
+        loadConversations();
+      }
+
+      document
+        .getElementById("replyText")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            sendReply();
+          }
+        });
+
+      loadConversations();
+
+      setInterval(() => {
+        loadConversations();
+
+        if (selectedPhone) {
+          openChat(selectedPhone);
+        }
+      }, 5000);
+    </script>
+  </body>
+</html>
