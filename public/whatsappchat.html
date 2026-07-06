@@ -18,6 +18,15 @@
         --bubble-out: #d9fdd3;
       }
 
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
       body {
         margin: 0;
         font-family: Arial, sans-serif;
@@ -46,6 +55,7 @@
         display: flex;
         flex-direction: column;
         background: var(--bg);
+        height: 100vh;
       }
 
       .chat-header {
@@ -54,6 +64,28 @@
         border-bottom: 1px solid var(--border);
         font-weight: bold;
         color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* Back button only shows on mobile */
+      .back-btn {
+        display: none;
+        background: none;
+        border: none;
+        padding: 4px 6px;
+        margin: 0;
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+        color: var(--text);
+        font-weight: bold;
+      }
+
+      .back-btn:hover {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 50%;
       }
 
       .messages {
@@ -106,6 +138,7 @@
         border: 1px solid var(--border);
         background: #ffffff;
         color: var(--text);
+        min-width: 0;
       }
 
       input:focus {
@@ -150,15 +183,51 @@
         margin-top: 5px;
       }
 
+      /* ================= MOBILE RESPONSIVE (WhatsApp app style) ================= */
       @media (max-width: 800px) {
         .layout {
-          grid-template-columns: 1fr;
+          display: block;
+          position: relative;
+          height: 100vh;
+          overflow: hidden;
         }
 
         .sidebar {
-          height: 35vh;
+          height: 100vh;
+          width: 100%;
           border-left: none;
-          border-bottom: 1px solid var(--border);
+          position: absolute;
+          top: 0;
+          right: 0;
+          left: 0;
+          transform: translateX(0);
+          transition: transform 0.25s ease;
+          z-index: 1;
+        }
+
+        .chat {
+          height: 100vh;
+          width: 100%;
+          position: absolute;
+          top: 0;
+          right: 0;
+          left: 0;
+          transform: translateX(100%);
+          transition: transform 0.25s ease;
+          z-index: 2;
+        }
+
+        /* When a chat is opened, slide chat in and sidebar out */
+        .layout.chat-open .sidebar {
+          transform: translateX(100%);
+        }
+
+        .layout.chat-open .chat {
+          transform: translateX(0);
+        }
+
+        .back-btn {
+          display: inline-block;
         }
 
         .message {
@@ -169,14 +238,23 @@
   </head>
 
   <body>
-    <div class="layout">
+    <div class="layout" id="layout">
       <aside class="sidebar">
         <h3>المحادثات</h3>
         <div id="conversations">Loading...</div>
       </aside>
 
       <section class="chat">
-        <div class="chat-header" id="chatTitle">اختر محادثة</div>
+        <div class="chat-header">
+          <button
+            class="back-btn"
+            onclick="closeChatMobile()"
+            aria-label="رجوع"
+          >
+            →
+          </button>
+          <span id="chatTitle">اختر محادثة</span>
+        </div>
         <div class="messages" id="messages">
           <div class="message incoming">هنا ستظهر رسائل العملاء</div>
         </div>
@@ -224,6 +302,15 @@
         });
       }
 
+      // Mobile view helpers (styling/UI state only, no data logic)
+      function openChatMobile() {
+        document.getElementById("layout").classList.add("chat-open");
+      }
+
+      function closeChatMobile() {
+        document.getElementById("layout").classList.remove("chat-open");
+      }
+
       async function loadConversations() {
         const box = document.getElementById("conversations");
 
@@ -254,6 +341,9 @@
       async function openChat(phone) {
         selectedPhone = phone;
         document.getElementById("chatTitle").innerText = phone;
+
+        // Slide to chat view on mobile
+        openChatMobile();
 
         const messagesBox = document.getElementById("messages");
         messagesBox.innerHTML = "Loading...";
