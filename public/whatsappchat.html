@@ -184,6 +184,7 @@
 
     <script>
       let selectedPhone = null;
+      let lastMessagesCount = 0;
 
       const SYSTEM_MESSAGE_TYPES = ["system"];
       const SYSTEM_TEXT_PATTERNS = [
@@ -262,6 +263,7 @@
         const visibleMessages = data.messages.filter(
           (m) => !isSystemMessage(m),
         );
+        lastMessagesCount = visibleMessages.length;
 
         if (!visibleMessages.length) {
           messagesBox.innerHTML =
@@ -328,10 +330,22 @@
 
       loadConversations();
 
-      setInterval(() => {
+      setInterval(async () => {
         loadConversations();
 
-        if (selectedPhone) {
+        if (!selectedPhone) return;
+
+        const res = await fetch(`/api/get-messages?phone=${selectedPhone}`);
+        const data = await res.json();
+
+        if (!data.success || !data.messages) return;
+
+        const visibleMessages = data.messages.filter(
+          (m) => !isSystemMessage(m),
+        );
+
+        if (visibleMessages.length !== lastMessagesCount) {
+          lastMessagesCount = visibleMessages.length;
           openChat(selectedPhone);
         }
       }, 5000);
