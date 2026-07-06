@@ -19,7 +19,7 @@
       body {
         margin: 0;
         font-family: Arial, sans-serif;
-        background: radial-gradient(circle at top, #1a1a1a, var(--bg) 60%);
+        background: var(--bg);
         color: var(--text);
       }
 
@@ -29,8 +29,13 @@
         height: 100vh;
       }
 
-      .sidebar {
+      .sidebar,
+      .chat-header,
+      .reply-box {
         background: var(--card);
+      }
+
+      .sidebar {
         border-left: 1px solid var(--border);
         padding: 16px;
         overflow-y: auto;
@@ -43,7 +48,6 @@
 
       .chat-header {
         padding: 16px;
-        background: var(--card);
         border-bottom: 1px solid var(--border);
         font-weight: bold;
       }
@@ -52,6 +56,7 @@
         flex: 1;
         padding: 20px;
         overflow-y: auto;
+        background: #0b141a;
       }
 
       .message {
@@ -70,19 +75,15 @@
       }
 
       .incoming {
-        background: #202020;
+        background: #202c33;
         color: var(--text);
         margin-left: auto;
         border: 1px solid var(--border);
       }
 
       .outgoing {
-        background: linear-gradient(
-          180deg,
-          var(--primary),
-          var(--primary-dark)
-        );
-        color: #000;
+        background: #005c4b;
+        color: var(--text);
         margin-right: auto;
       }
 
@@ -90,7 +91,6 @@
         display: flex;
         gap: 10px;
         padding: 16px;
-        background: var(--card);
         border-top: 1px solid var(--border);
       }
 
@@ -99,28 +99,28 @@
         padding: 12px;
         border-radius: 10px;
         border: 1px solid var(--border);
-        background: #0d0d0d;
+        background: #2a3942;
         color: var(--text);
       }
 
       input:focus {
         outline: none;
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+        box-shadow: 0 0 0 3px rgba(0, 168, 132, 0.18);
       }
 
       button {
         padding: 12px 18px;
         border: none;
         border-radius: 10px;
-        background: linear-gradient(
-          180deg,
-          var(--primary),
-          var(--primary-dark)
-        );
-        color: #000;
+        background: var(--primary);
+        color: #ffffff;
         font-weight: bold;
         cursor: pointer;
+      }
+
+      button:hover {
+        background: var(--primary-dark);
       }
 
       .conversation {
@@ -130,7 +130,7 @@
       }
 
       .conversation:hover {
-        background: #202020;
+        background: #202c33;
       }
 
       .phone {
