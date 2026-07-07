@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/whatsappchat",
+      "destination": "/whatsappchat.html"
+    },
+    {
       "source": "/",
       "destination": "/index.html"
     },
