@@ -6,12 +6,12 @@
       "destination": "/whatsappchat.html"
     },
     {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
       "source": "/chat",
       "destination": "/chat.html"
+    },
+    {
+      "source": "/",
+      "destination": "/index.html"
     }
   ]
 }
