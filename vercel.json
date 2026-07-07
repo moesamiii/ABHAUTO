@@ -1,17 +1,26 @@
 {
   "version": 2,
-  "rewrites": [
+  "trailingSlash": false,
+  "routes": [
     {
-      "source": "/whatsappchat",
-      "destination": "/whatsappchat.html"
+      "src": "/whatsappchat",
+      "dest": "/whatsappchat.html"
     },
     {
-      "source": "/chat",
-      "destination": "/chat.html"
+      "src": "/chat",
+      "dest": "/chat.html"
     },
     {
-      "source": "/",
-      "destination": "/index.html"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
     }
   ]
 }
