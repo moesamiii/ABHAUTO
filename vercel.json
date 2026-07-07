@@ -8,6 +8,14 @@
     {
       "source": "/chat",
       "destination": "/chat.html"
+    },
+    {
+      "source": "/whatsappchat",
+      "destination": "/whatsappchat.html"
+    },
+    {
+      "source": "/whatsappchat.html",
+      "destination": "/whatsappchat.html"
     }
   ]
 }
