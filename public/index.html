@@ -258,6 +258,24 @@
           <option value="2">القالب 2 — كودك صار له قيمة</option>
         </select>
 
+        <label>التأخير بين كل رسالة (بالثواني)</label>
+        <div style="display: flex; gap: 10px">
+          <input
+            id="delayMin"
+            type="number"
+            min="0"
+            value="3"
+            placeholder="أقل تأخير"
+          />
+          <input
+            id="delayMax"
+            type="number"
+            min="0"
+            value="7"
+            placeholder="أعلى تأخير"
+          />
+        </div>
+
         <div id="contactsList"></div>
 
         <button onclick="sendAll()">إرسال للجميع</button>
@@ -354,9 +372,22 @@
         alert("تم استيراد الأرقام بنجاح");
       }
 
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function randomDelayMs(minSeconds, maxSeconds) {
+        const min = Math.max(0, Number(minSeconds) || 0);
+        const max = Math.max(min, Number(maxSeconds) || min);
+        const seconds = min + Math.random() * (max - min);
+        return Math.round(seconds * 1000);
+      }
+
       async function sendAll() {
         const status = document.getElementById("status");
         const template = document.getElementById("templateSelect").value;
+        const delayMin = document.getElementById("delayMin").value;
+        const delayMax = document.getElementById("delayMax").value;
 
         if (contacts.length === 0) {
           alert("أضف أرقام أولاً");
@@ -368,7 +399,9 @@
 
         status.innerText = "جاري الإرسال...";
 
-        for (const contact of contacts) {
+        for (let i = 0; i < contacts.length; i++) {
+          const contact = contacts[i];
+
           try {
             const res = await fetch("/api/send-template", {
               method: "POST",
@@ -392,7 +425,19 @@
           }
 
           status.innerText = `✅ تم الإرسال: ${sent} | ❌ فشل: ${failed}`;
+
+          // Random delay before the next send, skip after the last contact
+          const isLast = i === contacts.length - 1;
+          if (!isLast) {
+            const waitMs = randomDelayMs(delayMin, delayMax);
+            status.innerText = `✅ تم الإرسال: ${sent} | ❌ فشل: ${failed} | ⏳ انتظار ${(
+              waitMs / 1000
+            ).toFixed(1)} ثانية...`;
+            await sleep(waitMs);
+          }
         }
+
+        status.innerText = `✅ اكتمل الإرسال — تم: ${sent} | فشل: ${failed}`;
       }
 
       renderContacts();
