@@ -8,10 +8,25 @@ function getMetaError(data) {
   return data?.error?.message || "WhatsApp rejected the template message";
 }
 
-// Real customer-facing text of the template body (used so the chat bubble
-// shows actual content the customer received, not an internal admin note)
-const TEMPLATE_CUSTOMER_TEXT =
-  "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.";
+const TEMPLATES = {
+  offer1: {
+    templateName: "abh_auto_offer_image_v1",
+    languageCode: "ar",
+    imageLink: "https://abhauto.vercel.app/offer1.jpeg",
+    customerText:
+      "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.",
+    useCustomerName: true,
+  },
+
+  offer2: {
+    templateName: "image_template_2",
+    languageCode: "ar",
+    imageLink: "https://abhauto.vercel.app/offer2.jpeg",
+    customerText:
+      "كودك صار له قيمة مع ABH Auto ✨ سجل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً.",
+    useCustomerName: true,
+  },
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -35,9 +50,33 @@ export default async function handler(req, res) {
 
     const phone = cleanPhone(req.body.to);
     const customerName = String(req.body.name || "عميلنا العزيز").trim();
+    const templateKey = String(req.body.templateKey || "offer1");
+
+    const selectedTemplate = TEMPLATES[templateKey] || TEMPLATES.offer1;
 
     if (!phone) {
       return res.status(400).json({ success: false, error: "Phone required" });
+    }
+
+    const components = [
+      {
+        type: "header",
+        parameters: [
+          {
+            type: "image",
+            image: {
+              link: selectedTemplate.imageLink,
+            },
+          },
+        ],
+      },
+    ];
+
+    if (selectedTemplate.useCustomerName) {
+      components.push({
+        type: "body",
+        parameters: [{ type: "text", text: customerName }],
+      });
     }
 
     const payload = {
@@ -45,25 +84,9 @@ export default async function handler(req, res) {
       to: phone,
       type: "template",
       template: {
-        name: "abh_auto_offer_image_v1",
-        language: { code: "ar" },
-        components: [
-          {
-            type: "header",
-            parameters: [
-              {
-                type: "image",
-                image: {
-                  link: "https://abhauto.vercel.app/offer1.jpeg",
-                },
-              },
-            ],
-          },
-          {
-            type: "body",
-            parameters: [{ type: "text", text: customerName }],
-          },
-        ],
+        name: selectedTemplate.templateName,
+        language: { code: selectedTemplate.languageCode },
+        components,
       },
     };
 
@@ -85,8 +108,6 @@ export default async function handler(req, res) {
       const errorMessage = getMetaError(data);
       const errorCode = data?.error?.code || null;
 
-      // Logged as "system" so it never renders as a chat bubble,
-      // but is still tracked in the messages table for reporting.
       await supabase.from("messages").insert({
         wa_message_id: null,
         phone,
@@ -106,13 +127,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Store the REAL customer-facing content, not an internal note
     await supabase.from("messages").insert({
       wa_message_id: data.messages?.[0]?.id || null,
       phone,
       direction: "outgoing",
       message_type: "template",
-      message: TEMPLATE_CUSTOMER_TEXT,
+      message: selectedTemplate.customerText,
       status: "accepted",
     });
 
@@ -120,7 +140,7 @@ export default async function handler(req, res) {
       {
         phone,
         customer_name: customerName,
-        last_message: TEMPLATE_CUSTOMER_TEXT,
+        last_message: selectedTemplate.customerText,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
@@ -129,10 +149,12 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: "Template accepted by WhatsApp",
+      template: selectedTemplate.templateName,
       data,
     });
   } catch (error) {
     console.error("SEND TEMPLATE ERROR:", error);
+
     return res.status(500).json({
       success: false,
       step: "server_error",

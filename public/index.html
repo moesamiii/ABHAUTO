@@ -252,6 +252,24 @@
 
         <div id="contactsList"></div>
 
+        <label>اختيار الرسالة</label>
+        <select
+          id="templateSelect"
+          style="
+            width: 100%;
+            padding: 13px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: #0d0d0d;
+            color: var(--text);
+            font-family: inherit;
+            margin-bottom: 14px;
+          "
+        >
+          <option value="offer1">العرض الأول</option>
+          <option value="offer2">العرض الثاني - كودك صار له قيمة</option>
+        </select>
+
         <button onclick="sendAll()">إرسال للجميع</button>
         <button class="danger" onclick="clearContacts()">مسح القائمة</button>
 
@@ -369,6 +387,7 @@
               body: JSON.stringify({
                 to: contact.phone,
                 name: contact.name,
+                templateKey: document.getElementById("templateSelect").value,
               }),
             });
 
