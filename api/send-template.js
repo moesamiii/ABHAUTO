@@ -23,7 +23,7 @@ const TEMPLATES = {
     languageCode: "ar",
     imageLink: "https://abhauto.vercel.app/offer2.jpeg",
     customerText:
-      "كودك صار له قيمة مع ABH Auto ✨ سجل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً.",
+      "كودك صار له قيمة مع ABH Auto ✨ سجل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً. اضغط على الزر بالأسفل للتسجيل الآن.",
     useCustomerName: true,
   },
 };
@@ -122,6 +122,7 @@ export default async function handler(req, res) {
       return res.status(400).json({
         success: false,
         step: "send_template",
+        selectedTemplate: selectedTemplate.templateName,
         error: errorMessage,
         meta: data,
       });
@@ -149,7 +150,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: "Template accepted by WhatsApp",
-      template: selectedTemplate.templateName,
+      selectedTemplate: selectedTemplate.templateName,
       data,
     });
   } catch (error) {
