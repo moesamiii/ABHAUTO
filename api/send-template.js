@@ -17,7 +17,6 @@ const TEMPLATES = {
       "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.",
     useCustomerName: true,
   },
-
   offer2: {
     templateName: "image_template_2",
     languageCode: "ar",
@@ -29,6 +28,8 @@ const TEMPLATES = {
 };
 
 export default async function handler(req, res) {
+  console.log("STEP 1 - API HIT", req.method);
+
   if (req.method !== "POST") {
     return res
       .status(405)
@@ -36,27 +37,45 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!process.env.SUPABASE_URL) throw new Error("Missing SUPABASE_URL");
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
-      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
-    if (!process.env.PHONE_NUMBER_ID)
-      throw new Error("Missing PHONE_NUMBER_ID");
-    if (!process.env.WHATSAPP_TOKEN) throw new Error("Missing WHATSAPP_TOKEN");
+    console.log("STEP 2 - BODY", req.body);
+
+    const requiredEnv = [
+      "SUPABASE_URL",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "PHONE_NUMBER_ID",
+      "WHATSAPP_TOKEN",
+    ];
+
+    for (const key of requiredEnv) {
+      if (!process.env[key]) {
+        console.log("MISSING ENV:", key);
+        return res.status(500).json({
+          success: false,
+          step: "env_check",
+          error: `Missing ${key}`,
+        });
+      }
+    }
+
+    console.log("STEP 3 - ENV OK");
 
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
     );
 
+    console.log("STEP 4 - SUPABASE CLIENT CREATED");
+
     const phone = cleanPhone(req.body.to);
     const customerName = String(req.body.name || "عميلنا العزيز").trim();
     const templateKey = String(req.body.templateKey || "offer1");
-
     const selectedTemplate = TEMPLATES[templateKey] || TEMPLATES.offer1;
 
     if (!phone) {
       return res.status(400).json({ success: false, error: "Phone required" });
     }
+
+    console.log("STEP 5 - SELECTED TEMPLATE", selectedTemplate.templateName);
 
     const components = [
       {
@@ -90,8 +109,10 @@ export default async function handler(req, res) {
       },
     };
 
+    console.log("STEP 6 - BEFORE META FETCH");
+
     const response = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
       {
         method: "POST",
         headers: {
@@ -102,11 +123,17 @@ export default async function handler(req, res) {
       },
     );
 
+    console.log("STEP 7 - AFTER META FETCH", response.status);
+
     const data = await response.json();
+
+    console.log("STEP 8 - META DATA", data);
 
     if (!response.ok) {
       const errorMessage = getMetaError(data);
       const errorCode = data?.error?.code || null;
+
+      console.log("STEP 9 - META FAILED", errorMessage);
 
       await supabase.from("messages").insert({
         wa_message_id: null,
@@ -128,6 +155,8 @@ export default async function handler(req, res) {
       });
     }
 
+    console.log("STEP 10 - BEFORE SUPABASE INSERT");
+
     await supabase.from("messages").insert({
       wa_message_id: data.messages?.[0]?.id || null,
       phone,
@@ -146,6 +175,8 @@ export default async function handler(req, res) {
       },
       { onConflict: "phone" },
     );
+
+    console.log("STEP 11 - DONE");
 
     return res.status(200).json({
       success: true,
