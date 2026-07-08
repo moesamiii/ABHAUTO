@@ -24,7 +24,8 @@ const TEMPLATES = {
     imageLink: "https://abhauto.vercel.app/offer2.jpeg",
     customerText:
       "كودك صار له قيمة مع ABH Auto ✨ سجل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً. اضغط على الزر بالأسفل للتسجيل الآن.",
-    useCustomerName: true,
+
+    useCustomerName: false,
   },
 };
 
