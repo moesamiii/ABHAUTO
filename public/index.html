@@ -366,6 +366,9 @@
 
       async function sendAll() {
         const status = document.getElementById("status");
+        const templateKey = document.getElementById("templateSelect").value;
+
+        console.log("SELECTED TEMPLATE FROM DASHBOARD:", templateKey);
 
         if (contacts.length === 0) {
           alert("أضف أرقام أولاً");
@@ -375,7 +378,7 @@
         let sent = 0;
         let failed = 0;
 
-        status.innerText = "جاري الإرسال...";
+        status.innerText = `جاري الإرسال باستخدام: ${templateKey}`;
 
         for (const contact of contacts) {
           try {
@@ -387,17 +390,24 @@
               body: JSON.stringify({
                 to: contact.phone,
                 name: contact.name,
-                templateKey: document.getElementById("templateSelect").value,
+                templateKey: templateKey,
               }),
             });
+
+            const result = await res.json();
+
+            console.log("API RESPONSE:", result);
 
             if (res.ok) {
               sent++;
             } else {
               failed++;
+              alert(`فشل الإرسال: ${result.error || "Unknown error"}`);
             }
           } catch (err) {
             failed++;
+            console.log("SEND ERROR:", err);
+            alert("صار خطأ أثناء الإرسال، افتح Console وشوف الخطأ");
           }
 
           status.innerText = `✅ تم الإرسال: ${sent} | ❌ فشل: ${failed}`;
