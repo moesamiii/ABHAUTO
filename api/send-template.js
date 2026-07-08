@@ -8,28 +8,12 @@ function getMetaError(data) {
   return data?.error?.message || "WhatsApp rejected the template message";
 }
 
-const TEMPLATES = {
-  offer1: {
-    templateName: "abh_auto_offer_image_v1",
-    languageCode: "ar",
-    imageLink: "https://abhauto.vercel.app/offer1.jpeg",
-    customerText:
-      "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.",
-    useCustomerName: true,
-  },
-  offer2: {
-    templateName: "image_template_2",
-    languageCode: "ar",
-    imageLink: "https://abhauto.vercel.app/offer2.jpeg",
-    customerText:
-      "كودك صار له قيمة مع ABH Auto ✨ سجل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً. اضغط على الزر بالأسفل للتسجيل الآن.",
-    useCustomerName: true,
-  },
-};
+// Real customer-facing text of the template body (used so the chat bubble
+// shows actual content the customer received, not an internal admin note)
+const TEMPLATE_CUSTOMER_TEXT =
+  "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.";
 
 export default async function handler(req, res) {
-  console.log("STEP 1 - API HIT", req.method);
-
   if (req.method !== "POST") {
     return res
       .status(405)
@@ -37,65 +21,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log("STEP 2 - BODY", req.body);
-
-    const requiredEnv = [
-      "SUPABASE_URL",
-      "SUPABASE_SERVICE_ROLE_KEY",
-      "PHONE_NUMBER_ID",
-      "WHATSAPP_TOKEN",
-    ];
-
-    for (const key of requiredEnv) {
-      if (!process.env[key]) {
-        console.log("MISSING ENV:", key);
-        return res.status(500).json({
-          success: false,
-          step: "env_check",
-          error: `Missing ${key}`,
-        });
-      }
-    }
-
-    console.log("STEP 3 - ENV OK");
+    if (!process.env.SUPABASE_URL) throw new Error("Missing SUPABASE_URL");
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY)
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+    if (!process.env.PHONE_NUMBER_ID)
+      throw new Error("Missing PHONE_NUMBER_ID");
+    if (!process.env.WHATSAPP_TOKEN) throw new Error("Missing WHATSAPP_TOKEN");
 
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY,
     );
 
-    console.log("STEP 4 - SUPABASE CLIENT CREATED");
-
     const phone = cleanPhone(req.body.to);
     const customerName = String(req.body.name || "عميلنا العزيز").trim();
-    const templateKey = String(req.body.templateKey || "offer1");
-    const selectedTemplate = TEMPLATES[templateKey] || TEMPLATES.offer1;
 
     if (!phone) {
       return res.status(400).json({ success: false, error: "Phone required" });
-    }
-
-    console.log("STEP 5 - SELECTED TEMPLATE", selectedTemplate.templateName);
-
-    const components = [
-      {
-        type: "header",
-        parameters: [
-          {
-            type: "image",
-            image: {
-              link: selectedTemplate.imageLink,
-            },
-          },
-        ],
-      },
-    ];
-
-    if (selectedTemplate.useCustomerName) {
-      components.push({
-        type: "body",
-        parameters: [{ type: "text", text: customerName }],
-      });
     }
 
     const payload = {
@@ -103,16 +45,30 @@ export default async function handler(req, res) {
       to: phone,
       type: "template",
       template: {
-        name: selectedTemplate.templateName,
-        language: { code: selectedTemplate.languageCode },
-        components,
+        name: "abh_auto_offer_image_v1",
+        language: { code: "ar" },
+        components: [
+          {
+            type: "header",
+            parameters: [
+              {
+                type: "image",
+                image: {
+                  link: "https://abhauto.vercel.app/offer1.jpeg",
+                },
+              },
+            ],
+          },
+          {
+            type: "body",
+            parameters: [{ type: "text", text: customerName }],
+          },
+        ],
       },
     };
 
-    console.log("STEP 6 - BEFORE META FETCH");
-
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
       {
         method: "POST",
         headers: {
@@ -123,18 +79,14 @@ export default async function handler(req, res) {
       },
     );
 
-    console.log("STEP 7 - AFTER META FETCH", response.status);
-
     const data = await response.json();
-
-    console.log("STEP 8 - META DATA", data);
 
     if (!response.ok) {
       const errorMessage = getMetaError(data);
       const errorCode = data?.error?.code || null;
 
-      console.log("STEP 9 - META FAILED", errorMessage);
-
+      // Logged as "system" so it never renders as a chat bubble,
+      // but is still tracked in the messages table for reporting.
       await supabase.from("messages").insert({
         wa_message_id: null,
         phone,
@@ -149,20 +101,18 @@ export default async function handler(req, res) {
       return res.status(400).json({
         success: false,
         step: "send_template",
-        selectedTemplate: selectedTemplate.templateName,
         error: errorMessage,
         meta: data,
       });
     }
 
-    console.log("STEP 10 - BEFORE SUPABASE INSERT");
-
+    // Store the REAL customer-facing content, not an internal note
     await supabase.from("messages").insert({
       wa_message_id: data.messages?.[0]?.id || null,
       phone,
       direction: "outgoing",
       message_type: "template",
-      message: selectedTemplate.customerText,
+      message: TEMPLATE_CUSTOMER_TEXT,
       status: "accepted",
     });
 
@@ -170,23 +120,19 @@ export default async function handler(req, res) {
       {
         phone,
         customer_name: customerName,
-        last_message: selectedTemplate.customerText,
+        last_message: TEMPLATE_CUSTOMER_TEXT,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
     );
 
-    console.log("STEP 11 - DONE");
-
     return res.status(200).json({
       success: true,
       message: "Template accepted by WhatsApp",
-      selectedTemplate: selectedTemplate.templateName,
       data,
     });
   } catch (error) {
     console.error("SEND TEMPLATE ERROR:", error);
-
     return res.status(500).json({
       success: false,
       step: "server_error",

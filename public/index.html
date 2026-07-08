@@ -252,24 +252,6 @@
 
         <div id="contactsList"></div>
 
-        <label>اختيار الرسالة</label>
-        <select
-          id="templateSelect"
-          style="
-            width: 100%;
-            padding: 13px 14px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            background: #0d0d0d;
-            color: var(--text);
-            font-family: inherit;
-            margin-bottom: 14px;
-          "
-        >
-          <option value="offer1">العرض الأول</option>
-          <option value="offer2">العرض الثاني - كودك صار له قيمة</option>
-        </select>
-
         <button onclick="sendAll()">إرسال للجميع</button>
         <button class="danger" onclick="clearContacts()">مسح القائمة</button>
 
@@ -366,9 +348,6 @@
 
       async function sendAll() {
         const status = document.getElementById("status");
-        const templateKey = document.getElementById("templateSelect").value;
-
-        console.log("SELECTED TEMPLATE FROM DASHBOARD:", templateKey);
 
         if (contacts.length === 0) {
           alert("أضف أرقام أولاً");
@@ -378,7 +357,7 @@
         let sent = 0;
         let failed = 0;
 
-        status.innerText = `جاري الإرسال باستخدام: ${templateKey}`;
+        status.innerText = "جاري الإرسال...";
 
         for (const contact of contacts) {
           try {
@@ -390,24 +369,16 @@
               body: JSON.stringify({
                 to: contact.phone,
                 name: contact.name,
-                templateKey: templateKey,
               }),
             });
-
-            const result = await res.json();
-
-            console.log("API RESPONSE:", result);
 
             if (res.ok) {
               sent++;
             } else {
               failed++;
-              alert(`فشل الإرسال: ${result.error || "Unknown error"}`);
             }
           } catch (err) {
             failed++;
-            console.log("SEND ERROR:", err);
-            alert("صار خطأ أثناء الإرسال، افتح Console وشوف الخطأ");
           }
 
           status.innerText = `✅ تم الإرسال: ${sent} | ❌ فشل: ${failed}`;
