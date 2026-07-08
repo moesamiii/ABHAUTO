@@ -8,10 +8,56 @@ function getMetaError(data) {
   return data?.error?.message || "WhatsApp rejected the template message";
 }
 
-// Real customer-facing text of the template body (used so the chat bubble
-// shows actual content the customer received, not an internal admin note)
-const TEMPLATE_CUSTOMER_TEXT =
-  "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.";
+// Config for every template we support. Add a new entry here whenever
+// you create a new template in Meta.
+const TEMPLATES = {
+  1: {
+    name: "abh_auto_offer_image_v1",
+    language: "ar",
+    imageLink: "https://abhauto.vercel.app/offer1.jpeg",
+    // Real customer-facing text of the template body (used so the chat
+    // bubble shows actual content the customer received)
+    customerText:
+      "سيارتك تستحق عناية تليق فيها ✨🚗 استفد من عرض ABH Auto على خدمات العناية بالسيارات، التظليل الحراري، النانو سيراميك، والحماية. اضغط على الزر بالأسفل للحجز أو لمعرفة التفاصيل.",
+    buildComponents: (customerName) => [
+      {
+        type: "header",
+        parameters: [
+          {
+            type: "image",
+            image: { link: "https://abhauto.vercel.app/offer1.jpeg" },
+          },
+        ],
+      },
+      {
+        type: "body",
+        parameters: [{ type: "text", text: customerName }],
+      },
+    ],
+  },
+  2: {
+    name: "image_template_2",
+    language: "ar",
+    imageLink: "https://abhauto.vercel.app/offer2.jpeg",
+    customerText:
+      "مرحباً 👋 كودك صار له قيمة ✨ سجّل في الموقع، واحصل على كودك، وشاركه مع أصدقائك. كل استخدام ناجح للكود يمنحك خصماً ويمنحهم خصماً أيضاً. اضغط الزر بالأسفل للتسجيل الآن.",
+    buildComponents: (customerName) => [
+      {
+        type: "header",
+        parameters: [
+          {
+            type: "image",
+            image: { link: "https://abhauto.vercel.app/offer2.jpeg" },
+          },
+        ],
+      },
+      {
+        type: "body",
+        parameters: [{ type: "text", text: customerName }],
+      },
+    ],
+  },
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -36,8 +82,18 @@ export default async function handler(req, res) {
     const phone = cleanPhone(req.body.to);
     const customerName = String(req.body.name || "عميلنا العزيز").trim();
 
+    // Which template to send. Defaults to "1" so old callers still work.
+    const templateKey = String(req.body.template || "1");
+    const templateConfig = TEMPLATES[templateKey];
+
     if (!phone) {
       return res.status(400).json({ success: false, error: "Phone required" });
+    }
+
+    if (!templateConfig) {
+      return res
+        .status(400)
+        .json({ success: false, error: `Unknown template: ${templateKey}` });
     }
 
     const payload = {
@@ -45,25 +101,9 @@ export default async function handler(req, res) {
       to: phone,
       type: "template",
       template: {
-        name: "abh_auto_offer_image_v1",
-        language: { code: "ar" },
-        components: [
-          {
-            type: "header",
-            parameters: [
-              {
-                type: "image",
-                image: {
-                  link: "https://abhauto.vercel.app/offer1.jpeg",
-                },
-              },
-            ],
-          },
-          {
-            type: "body",
-            parameters: [{ type: "text", text: customerName }],
-          },
-        ],
+        name: templateConfig.name,
+        language: { code: templateConfig.language },
+        components: templateConfig.buildComponents(customerName),
       },
     };
 
@@ -112,7 +152,7 @@ export default async function handler(req, res) {
       phone,
       direction: "outgoing",
       message_type: "template",
-      message: TEMPLATE_CUSTOMER_TEXT,
+      message: templateConfig.customerText,
       status: "accepted",
     });
 
@@ -120,7 +160,7 @@ export default async function handler(req, res) {
       {
         phone,
         customer_name: customerName,
-        last_message: TEMPLATE_CUSTOMER_TEXT,
+        last_message: templateConfig.customerText,
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },

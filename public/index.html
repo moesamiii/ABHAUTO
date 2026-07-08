@@ -99,7 +99,8 @@
         font-size: 14px;
       }
 
-      input {
+      input,
+      select {
         width: 100%;
         padding: 13px 14px;
         border-radius: 10px;
@@ -110,7 +111,8 @@
         margin-bottom: 14px;
       }
 
-      input:focus {
+      input:focus,
+      select:focus {
         outline: none;
         border-color: var(--primary);
         box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
@@ -250,6 +252,12 @@
       <div class="card">
         <h2>قائمة الإرسال</h2>
 
+        <label>اختر القالب</label>
+        <select id="templateSelect">
+          <option value="1">القالب 1 — عرض العناية بالسيارات</option>
+          <option value="2">القالب 2 — كودك صار له قيمة</option>
+        </select>
+
         <div id="contactsList"></div>
 
         <button onclick="sendAll()">إرسال للجميع</button>
@@ -348,6 +356,7 @@
 
       async function sendAll() {
         const status = document.getElementById("status");
+        const template = document.getElementById("templateSelect").value;
 
         if (contacts.length === 0) {
           alert("أضف أرقام أولاً");
@@ -369,6 +378,7 @@
               body: JSON.stringify({
                 to: contact.phone,
                 name: contact.name,
+                template,
               }),
             });
 
