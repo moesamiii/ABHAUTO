@@ -35,6 +35,28 @@ export default async function handler(req, res) {
     const base64Data = imageBase64.split(",")[1];
     const imageBuffer = Buffer.from(base64Data, "base64");
 
+    // NEW: keep our own permanent copy of the image so the dashboard
+    // can display it later — Meta's media IDs aren't retrievable this way.
+    const ext = (mimeType.split("/")[1] || "jpg").split(";")[0];
+    const storagePath = `outgoing/${Date.now()}-${(fileName || "image").replace(/[^a-zA-Z0-9._-]/g, "_")}.${ext}`;
+
+    let mediaUrl = null;
+    const { error: storageError } = await supabase.storage
+      .from("whatsapp-media")
+      .upload(storagePath, imageBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (storageError) {
+      console.error("OUTGOING MEDIA STORAGE ERROR:", storageError);
+    } else {
+      const { data: publicUrlData } = supabase.storage
+        .from("whatsapp-media")
+        .getPublicUrl(storagePath);
+      mediaUrl = publicUrlData?.publicUrl || null;
+    }
+
     const formData = new FormData();
     formData.append("messaging_product", "whatsapp");
     formData.append(
@@ -132,6 +154,7 @@ export default async function handler(req, res) {
       direction: "outgoing",
       message_type: "image",
       message: message || "Image sent",
+      media_url: mediaUrl,
       status: "accepted",
     });
 
@@ -147,6 +170,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       media_id: mediaId,
+      media_url: mediaUrl,
       data: sendData,
     });
   } catch (error) {
