@@ -321,14 +321,13 @@
 
       .message {
         max-width: 65%;
+        width: fit-content;
         padding: 6px 9px 8px 9px;
         border-radius: 8px;
         position: relative;
         box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
         font-size: 14.3px;
         line-height: 1.4;
-        word-break: break-word;
-        white-space: pre-wrap;
       }
 
       .incoming .message.grouped {
@@ -341,6 +340,8 @@
 
       .message .bubble-text {
         display: block;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .message .bubble-meta {
@@ -379,6 +380,7 @@
         padding: 6px 5px 0;
         font-size: 14.3px;
         line-height: 1.4;
+        white-space: pre-wrap;
         word-break: break-word;
       }
 
@@ -728,6 +730,15 @@
           .replace(/>/g, "&gt;");
       }
 
+      function cleanMessageText(text) {
+        return String(text || "")
+          .replace(/\r\n/g, "\n")
+          .replace(/[ \t]+\n/g, "\n") // trailing spaces before a break
+          .replace(/\n{2,}/g, "\n") // collapse blank-line gaps
+          .replace(/[ \t]{2,}/g, " ") // collapse repeated spaces
+          .trim();
+      }
+
       function initials(phone) {
         const digits = (phone || "").replace(/\D/g, "");
         return digits ? digits.slice(-2) : "؟";
@@ -788,7 +799,7 @@
       }
 
       function renderMessageBody(m) {
-        const rawText = (m.message || "").trim();
+        const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
         const looksLikeImageTag =
           /^\[image\]$/i.test(rawText) || m.message_type === "image";
@@ -847,7 +858,7 @@
       }
 
       function isMediaMessage(m) {
-        const rawText = (m.message || "").trim();
+        const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
         return (
           (mediaUrl && IMAGE_EXT.test(mediaUrl)) ||
@@ -932,7 +943,7 @@
               <div class="conversation-top">
                 <div class="conv-phone">${escapeHtml(c.phone)}</div>
               </div>
-              <div class="conv-last">${escapeHtml(c.last_message || "")}</div>
+              <div class="conv-last">${escapeHtml(cleanMessageText(c.last_message).slice(0, 80))}</div>
             </div>
           </div>
         `,
