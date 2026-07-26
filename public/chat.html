@@ -798,29 +798,89 @@
         </svg>`;
       }
 
+      function audioIconSvg() {
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>
+        </svg>`;
+      }
+
+      function videoIconSvg() {
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="2" y="5" width="15" height="14" rx="2"/>
+          <path d="M22 8l-5 4 5 4V8z"/>
+        </svg>`;
+      }
+
+      function contactIconSvg() {
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="8" r="4"/>
+          <path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/>
+        </svg>`;
+      }
+
+      function locationIconSvg() {
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/>
+          <circle cx="12" cy="10" r="2.5"/>
+        </svg>`;
+      }
+
+      function warnIconSvg() {
+        return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 9v4M12 17h.01"/>
+          <path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+        </svg>`;
+      }
+
+      const TAG_CHIPS = {
+        image: { icon: imgIconSvg, label: "صورة" },
+        document: { icon: docIconSvg, label: "مستند" },
+        audio: { icon: audioIconSvg, label: "رسالة صوتية" },
+        video: { icon: videoIconSvg, label: "فيديو" },
+        sticker: { icon: imgIconSvg, label: "ملصق" },
+        contacts: { icon: contactIconSvg, label: "جهة اتصال" },
+        location: { icon: locationIconSvg, label: "موقع" },
+        unsupported: {
+          icon: warnIconSvg,
+          label: "نوع رسالة غير مدعوم من واتساب",
+        },
+      };
+
+      function renderTagChip(tag, subtext) {
+        const entry = TAG_CHIPS[tag] || { icon: warnIconSvg, label: tag };
+        return `
+          <div class="doc-chip">
+            <div class="doc-icon">${entry.icon()}</div>
+            <div><div class="doc-name">${escapeHtml(entry.label)}</div><div class="doc-sub">${escapeHtml(subtext || "")}</div></div>
+          </div>
+        `;
+      }
+
       function renderMessageBody(m) {
         const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
-        const looksLikeImageTag =
-          /^\[image\]$/i.test(rawText) || m.message_type === "image";
-        const looksLikeDocTag =
-          /^\[document\]$/i.test(rawText) || m.message_type === "document";
+        const tagMatch = /^\[(\w+)\]$/i.exec(rawText);
+        const tag = tagMatch
+          ? tagMatch[1].toLowerCase()
+          : (m.message_type || "").toLowerCase();
 
-        // Case 1: we have a real media URL and it's an image
-        if (mediaUrl && (IMAGE_EXT.test(mediaUrl) || looksLikeImageTag)) {
-          const caption = looksLikeImageTag
-            ? ""
-            : rawText && rawText !== mediaUrl
-              ? rawText
-              : "";
+        // Case 1: real media URL + it's an image
+        if (mediaUrl && (IMAGE_EXT.test(mediaUrl) || tag === "image")) {
+          const caption =
+            tag === "image"
+              ? ""
+              : rawText && rawText !== mediaUrl
+                ? rawText
+                : "";
           return `
             <img class="media-image" src="${escapeHtml(mediaUrl)}" alt="صورة" onclick="window.open('${escapeHtml(mediaUrl)}', '_blank')" />
             ${caption ? `<div class="media-caption">${escapeHtml(caption)}</div>` : ""}
           `;
         }
 
-        // Case 2: we have a real media URL and it's a document
-        if (mediaUrl && (DOC_EXT.test(mediaUrl) || looksLikeDocTag)) {
+        // Case 2: real media URL + it's a document
+        if (mediaUrl && (DOC_EXT.test(mediaUrl) || tag === "document")) {
           const name = m.filename || fileNameFromUrl(mediaUrl);
           return `
             <a href="${escapeHtml(mediaUrl)}" target="_blank" style="text-decoration:none;">
@@ -835,22 +895,19 @@
           `;
         }
 
-        // Case 3: no URL available, only a placeholder tag from the data source
-        if (looksLikeImageTag) {
-          return `
-            <div class="doc-chip">
-              <div class="doc-icon">${imgIconSvg()}</div>
-              <div><div class="doc-name">صورة</div><div class="doc-sub">لا يوجد رابط متاح</div></div>
-            </div>
-          `;
+        // Case 3: real media URL + it's audio
+        if (mediaUrl && tag === "audio") {
+          return `<audio controls src="${escapeHtml(mediaUrl)}" style="width: 240px; height: 40px;"></audio>`;
         }
-        if (looksLikeDocTag) {
-          return `
-            <div class="doc-chip">
-              <div class="doc-icon">${docIconSvg()}</div>
-              <div><div class="doc-name">مستند</div><div class="doc-sub">لا يوجد رابط متاح</div></div>
-            </div>
-          `;
+
+        // Case 4: real media URL + it's video
+        if (mediaUrl && tag === "video") {
+          return `<video controls src="${escapeHtml(mediaUrl)}" style="width: 100%; max-height: 320px; border-radius: 6px; display:block;"></video>`;
+        }
+
+        // Case 5: a known tag but no URL available to actually play/show it
+        if (tag && TAG_CHIPS[tag]) {
+          return renderTagChip(tag, mediaUrl ? "" : "لا يوجد رابط متاح");
         }
 
         // Default: plain text
@@ -861,9 +918,10 @@
         const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
         return (
-          (mediaUrl && IMAGE_EXT.test(mediaUrl)) ||
-          /^\[image\]$/i.test(rawText) ||
-          m.message_type === "image"
+          mediaUrl &&
+          (IMAGE_EXT.test(mediaUrl) ||
+            /^\[(image|video)\]$/i.test(rawText) ||
+            ["image", "video"].includes((m.message_type || "").toLowerCase()))
         );
       }
 
