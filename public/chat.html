@@ -2,187 +2,617 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
     <title>ABH WhatsApp Chat</title>
 
     <style>
       :root {
-        --bg: #050505;
-        --card: #111111;
-        --border: #2a2a2a;
-        --text: #f5f5f5;
-        --muted: #9a9a9a;
-        --primary: #ffffff;
-        --primary-dark: #b8b8b8;
+        --wa-header: #008069;
+        --wa-header-dark: #075e54;
+        --wa-teal-light: #25d366;
+        --wa-panel: #ffffff;
+        --wa-chat-bg: #efeae2;
+        --wa-sent: #d9fdd3;
+        --wa-received: #ffffff;
+        --wa-border: #e9edef;
+        --wa-text: #111b21;
+        --wa-muted: #667781;
+        --wa-active-row: #f0f2f1;
+        --wa-hover: #f5f6f6;
+        --wa-tick-read: #53bdeb;
+        --wa-danger: #e74c3c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
       }
 
       body {
         margin: 0;
-        font-family: Arial, sans-serif;
-        background: radial-gradient(circle at top, #1a1a1a, var(--bg) 60%);
-        color: var(--text);
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: var(--wa-chat-bg);
+        color: var(--wa-text);
+        -webkit-font-smoothing: antialiased;
       }
+
+      /* ---------- LAYOUT ---------- */
 
       .layout {
         display: grid;
-        grid-template-columns: 320px 1fr;
+        grid-template-columns: 400px 1fr;
         height: 100vh;
+        max-width: 1600px;
+        margin: 0 auto;
+        background: var(--wa-panel);
+        box-shadow: 0 0 0 1px var(--wa-border);
       }
 
+      /* ---------- SIDEBAR ---------- */
+
       .sidebar {
-        background: var(--card);
-        border-left: 1px solid var(--border);
-        padding: 16px;
+        background: var(--wa-panel);
+        border-left: 1px solid var(--wa-border);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 16px;
+        background: var(--wa-panel);
+        border-bottom: 1px solid var(--wa-border);
+      }
+
+      .sidebar-header h1 {
+        font-size: 17px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--wa-text);
+      }
+
+      .back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: none;
+        background: transparent;
+        color: var(--wa-muted);
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.15s ease;
+      }
+
+      .back-btn:hover {
+        background: var(--wa-hover);
+      }
+
+      .search-wrap {
+        padding: 8px 12px;
+      }
+
+      .search-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f0f2f5;
+        border-radius: 10px;
+        padding: 8px 12px;
+      }
+
+      .search-box svg {
+        flex-shrink: 0;
+        color: var(--wa-muted);
+      }
+
+      .search-box input {
+        border: none;
+        background: transparent;
+        outline: none;
+        width: 100%;
+        font-size: 14px;
+        color: var(--wa-text);
+      }
+
+      .conversations {
+        flex: 1;
         overflow-y: auto;
       }
+
+      .conversation {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #f2f2f2;
+        transition: background 0.12s ease;
+      }
+
+      .conversation:hover {
+        background: var(--wa-hover);
+      }
+
+      .conversation.active {
+        background: var(--wa-active-row);
+      }
+
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #cfd8dc, #90a4ae);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 16px;
+        flex-shrink: 0;
+        user-select: none;
+      }
+
+      .conversation-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .conversation-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .conv-phone {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--wa-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        direction: ltr;
+        text-align: right;
+      }
+
+      .conv-last {
+        color: var(--wa-muted);
+        font-size: 13.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .empty-state,
+      .loading-state {
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--wa-muted);
+        font-size: 14px;
+      }
+
+      /* ---------- CHAT PANEL ---------- */
 
       .chat {
         display: flex;
         flex-direction: column;
+        min-height: 0;
+        min-width: 0;
       }
 
       .chat-header {
-        padding: 16px;
-        background: var(--card);
-        border-bottom: 1px solid var(--border);
-        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        background: var(--wa-panel);
+        border-bottom: 1px solid var(--wa-border);
+        min-height: 60px;
+      }
+
+      .chat-header .avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+      }
+
+      .chat-header-info {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+      }
+
+      .chat-header-name {
+        font-weight: 600;
+        font-size: 15.5px;
+        direction: ltr;
+        text-align: right;
+      }
+
+      .chat-header-sub {
+        font-size: 12.5px;
+        color: var(--wa-muted);
+      }
+
+      .chat-placeholder {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        color: var(--wa-muted);
+        background: var(--wa-chat-bg);
+        text-align: center;
+        padding: 20px;
+      }
+
+      .chat-placeholder svg {
+        opacity: 0.4;
       }
 
       .messages {
         flex: 1;
-        padding: 20px;
+        padding: 18px 6% 18px;
         overflow-y: auto;
-      }
-
-      .message {
-        max-width: 60%;
-        padding: 10px 14px;
-        border-radius: 12px;
-        margin-bottom: 10px;
-        word-break: break-word;
-      }
-
-      .incoming {
-        background: #202020;
-        color: var(--text);
-        margin-left: auto;
-        border: 1px solid var(--border);
-      }
-
-      .outgoing {
-        background: linear-gradient(
-          180deg,
-          var(--primary),
-          var(--primary-dark)
-        );
-        color: #000;
-        margin-right: auto;
-      }
-
-      .reply-box {
+        background-color: var(--wa-chat-bg);
+        background-image:
+          radial-gradient(
+            circle at 20px 20px,
+            rgba(0, 0, 0, 0.025) 2px,
+            transparent 0
+          ),
+          radial-gradient(
+            circle at 60px 60px,
+            rgba(0, 0, 0, 0.02) 2px,
+            transparent 0
+          );
+        background-size: 80px 80px;
         display: flex;
-        gap: 10px;
-        padding: 16px;
-        background: var(--card);
-        border-top: 1px solid var(--border);
+        flex-direction: column;
+        gap: 3px;
       }
 
-      input {
-        flex: 1;
-        padding: 12px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: #0d0d0d;
-        color: var(--text);
+      .day-divider {
+        align-self: center;
+        background: #e1f2fb;
+        color: #54656f;
+        font-size: 12.5px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        margin: 14px 0;
+        box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.08);
       }
 
-      input:focus {
-        outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
-      }
-
-      button {
-        padding: 12px 18px;
-        border: none;
-        border-radius: 10px;
-        background: linear-gradient(
-          180deg,
-          var(--primary),
-          var(--primary-dark)
-        );
-        color: #000;
-        font-weight: bold;
-        cursor: pointer;
-      }
-
-      .back {
-        margin-bottom: 16px;
+      .message-row {
+        display: flex;
         width: 100%;
       }
 
-      .conversation {
-        padding: 12px;
-        border-bottom: 1px solid var(--border);
+      .message-row.outgoing {
+        justify-content: flex-start; /* RTL: sent messages sit on the left, like Arabic WhatsApp */
+      }
+
+      .message-row.incoming {
+        justify-content: flex-end; /* RTL: received messages sit on the right */
+      }
+
+      .message {
+        max-width: 65%;
+        padding: 6px 9px 8px 9px;
+        border-radius: 8px;
+        position: relative;
+        box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+        font-size: 14.3px;
+        line-height: 1.4;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .message .bubble-text {
+        display: block;
+      }
+
+      .message .bubble-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        font-size: 11px;
+        color: rgba(0, 0, 0, 0.45);
+        margin-top: 3px;
+        direction: ltr;
+      }
+
+      .incoming .message {
+        background: var(--wa-received);
+        border-top-right-radius: 0;
+      }
+
+      .outgoing .message {
+        background: var(--wa-sent);
+        border-top-left-radius: 0;
+      }
+
+      .tick {
+        display: inline-flex;
+      }
+
+      .tick.read {
+        color: var(--wa-tick-read);
+      }
+
+      @media (max-width: 800px) {
+        .messages {
+          padding-left: 3%;
+          padding-right: 3%;
+        }
+        .message {
+          max-width: 82%;
+        }
+      }
+
+      /* ---------- REPLY BOX ---------- */
+
+      .reply-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        background: var(--wa-panel);
+        border-top: 1px solid var(--wa-border);
+      }
+
+      .reply-input-wrap {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        background: #f0f2f5;
+        border-radius: 22px;
+        padding: 4px 6px 4px 16px;
+      }
+
+      .reply-input-wrap input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        outline: none;
+        font-size: 14.5px;
+        padding: 9px 6px;
+        color: var(--wa-text);
+      }
+
+      .send-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        background: var(--wa-header);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
+        flex-shrink: 0;
+        transition:
+          background 0.15s ease,
+          transform 0.1s ease;
       }
 
-      .conversation:hover {
-        background: #202020;
+      .send-btn:hover {
+        background: var(--wa-header-dark);
       }
 
-      .phone {
-        font-weight: bold;
-        color: var(--text);
+      .send-btn:active {
+        transform: scale(0.94);
       }
 
-      .last {
-        color: var(--muted);
-        font-size: 13px;
-        margin-top: 5px;
+      .send-btn:disabled {
+        background: #b9c1c4;
+        cursor: default;
       }
+
+      /* ---------- MOBILE ---------- */
 
       @media (max-width: 800px) {
         .layout {
           grid-template-columns: 1fr;
+          box-shadow: none;
+        }
+
+        .chat {
+          position: fixed;
+          inset: 0;
+          transform: translateX(100%);
+          transition: transform 0.22s ease;
+          z-index: 5;
+          background: var(--wa-panel);
+        }
+
+        [dir="rtl"] .chat {
+          transform: translateX(-100%);
+        }
+
+        .layout.chat-open .chat {
+          transform: translateX(0);
+        }
+
+        .chat-header .back-btn {
+          display: flex;
         }
 
         .sidebar {
-          height: 35vh;
           border-left: none;
-          border-bottom: 1px solid var(--border);
         }
+      }
 
-        .message {
-          max-width: 85%;
-        }
+      .chat-header .back-btn {
+        display: none;
+      }
+
+      /* scrollbars */
+      .conversations::-webkit-scrollbar,
+      .messages::-webkit-scrollbar {
+        width: 6px;
+      }
+      .conversations::-webkit-scrollbar-thumb,
+      .messages::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.18);
+        border-radius: 4px;
       }
     </style>
   </head>
 
   <body>
-    <div class="layout">
+    <div class="layout" id="layout">
       <aside class="sidebar">
-        <button class="back" onclick="window.location.href = '/'">رجوع</button>
-        <h3>المحادثات</h3>
-        <div id="conversations">Loading...</div>
-      </aside>
-
-      <section class="chat">
-        <div class="chat-header" id="chatTitle">اختر محادثة</div>
-        <div class="messages" id="messages">
-          <div class="message incoming">هنا ستظهر رسائل العملاء</div>
+        <div class="sidebar-header">
+          <button
+            class="back-btn"
+            onclick="window.location.href = '/'"
+            title="رجوع"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <h1>محادثات ABH</h1>
+          <span style="width: 34px"></span>
         </div>
 
-        <div class="reply-box">
-          <input id="replyText" placeholder="اكتب الرد هنا..." />
-          <button onclick="sendReply()">إرسال</button>
+        <div class="search-wrap">
+          <div class="search-box">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" stroke-linecap="round" />
+            </svg>
+            <input
+              id="searchInput"
+              placeholder="ابحث برقم الهاتف"
+              oninput="filterConversations()"
+            />
+          </div>
+        </div>
+
+        <div class="conversations" id="conversations">
+          <div class="loading-state">جاري التحميل...</div>
+        </div>
+      </aside>
+
+      <section class="chat" id="chatPanel">
+        <div id="chatEmpty" class="chat-placeholder">
+          <svg
+            width="80"
+            height="80"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+          >
+            <path
+              d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+            />
+          </svg>
+          <div>اختر محادثة من القائمة لعرض الرسائل</div>
+        </div>
+
+        <div
+          id="chatActive"
+          style="display: none; flex-direction: column; flex: 1; min-height: 0"
+        >
+          <div class="chat-header">
+            <button class="back-btn" onclick="closeChat()" title="رجوع">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M15 18l-6-6 6-6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div class="avatar" id="chatAvatar">؟</div>
+            <div class="chat-header-info">
+              <div class="chat-header-name" id="chatTitle">اختر محادثة</div>
+              <div class="chat-header-sub">واتساب - ABH</div>
+            </div>
+          </div>
+
+          <div class="messages" id="messages"></div>
+
+          <div class="reply-box">
+            <div class="reply-input-wrap">
+              <input
+                id="replyText"
+                placeholder="اكتب رسالة"
+                onkeydown="if (event.key === 'Enter') sendReply();"
+              />
+            </div>
+            <button
+              class="send-btn"
+              onclick="sendReply()"
+              id="sendBtn"
+              title="إرسال"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                style="transform: scaleX(-1)"
+              >
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
+              </svg>
+            </button>
+          </div>
         </div>
       </section>
     </div>
 
     <script>
       let selectedPhone = null;
+      let allConversations = [];
 
       // Anything with message_type "system" is an internal log
       // (failed sends, delivery notes) and must never render as a bubble.
@@ -207,6 +637,66 @@
         return SYSTEM_TEXT_PATTERNS.some((pattern) => pattern.test(text));
       }
 
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function initials(phone) {
+        const digits = (phone || "").replace(/\D/g, "");
+        return digits ? digits.slice(-2) : "؟";
+      }
+
+      function formatTime(m) {
+        const raw = m.timestamp || m.created_at || m.sent_at || m.time;
+        if (!raw) return "";
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleTimeString("ar-EG", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      function formatDay(m) {
+        const raw = m.timestamp || m.created_at || m.sent_at || m.time;
+        if (!raw) return null;
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return null;
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+
+        const sameDay = (a, b) =>
+          a.getFullYear() === b.getFullYear() &&
+          a.getMonth() === b.getMonth() &&
+          a.getDate() === b.getDate();
+
+        if (sameDay(d, today)) return "اليوم";
+        if (sameDay(d, yesterday)) return "أمس";
+        return d.toLocaleDateString("ar-EG", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      }
+
+      function tickIcon(m) {
+        if (m.direction === "incoming") return "";
+        const status = m.status || "sent";
+        const isRead = status === "read";
+        const isDelivered = status === "delivered" || status === "read";
+        if (!isDelivered) {
+          return `<svg class="tick" width="15" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5 9.5L10 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        }
+        return `<svg class="tick ${isRead ? "read" : ""}" width="18" height="11" viewBox="0 0 18 11" fill="none">
+          <path d="M1 5.5L5 9.5L10 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6 5.5L10 9.5L17 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+      }
+
       async function loadConversations() {
         const box = document.getElementById("conversations");
 
@@ -215,38 +705,86 @@
           const data = await res.json();
 
           if (!data.success || !data.conversations.length) {
-            box.innerHTML = "لا يوجد محادثات حالياً";
+            box.innerHTML =
+              "<div class='empty-state'>لا يوجد محادثات حالياً</div>";
+            allConversations = [];
             return;
           }
 
-          box.innerHTML = data.conversations
-            .map(
-              (c) => `
-          <div class="conversation" onclick="openChat('${c.phone}')">
-            <div class="phone">${c.phone}</div>
-            <div class="last">${c.last_message || ""}</div>
+          allConversations = data.conversations;
+          renderConversations(allConversations);
+        } catch (err) {
+          box.innerHTML =
+            "<div class='empty-state'>حدث خطأ في تحميل المحادثات</div>";
+        }
+      }
+
+      function renderConversations(list) {
+        const box = document.getElementById("conversations");
+
+        if (!list.length) {
+          box.innerHTML = "<div class='empty-state'>لا توجد نتائج</div>";
+          return;
+        }
+
+        box.innerHTML = list
+          .map(
+            (c) => `
+          <div class="conversation ${c.phone === selectedPhone ? "active" : ""}" onclick="openChat('${c.phone}')">
+            <div class="avatar">${initials(c.phone)}</div>
+            <div class="conversation-info">
+              <div class="conversation-top">
+                <div class="conv-phone">${escapeHtml(c.phone)}</div>
+              </div>
+              <div class="conv-last">${escapeHtml(c.last_message || "")}</div>
+            </div>
           </div>
         `,
-            )
-            .join("");
-        } catch (err) {
-          box.innerHTML = "حدث خطأ في تحميل المحادثات";
+          )
+          .join("");
+      }
+
+      function filterConversations() {
+        const q = document.getElementById("searchInput").value.trim();
+        if (!q) {
+          renderConversations(allConversations);
+          return;
         }
+        const filtered = allConversations.filter((c) =>
+          (c.phone || "").includes(q),
+        );
+        renderConversations(filtered);
+      }
+
+      function openMobileChat() {
+        document.getElementById("layout").classList.add("chat-open");
+      }
+
+      function closeChat() {
+        document.getElementById("layout").classList.remove("chat-open");
       }
 
       async function openChat(phone) {
         selectedPhone = phone;
+
+        document.getElementById("chatEmpty").style.display = "none";
+        document.getElementById("chatActive").style.display = "flex";
         document.getElementById("chatTitle").innerText = phone;
+        document.getElementById("chatAvatar").innerText = initials(phone);
+
+        renderConversations(allConversations);
+        openMobileChat();
 
         const messagesBox = document.getElementById("messages");
-        messagesBox.innerHTML = "Loading...";
+        messagesBox.innerHTML =
+          "<div class='empty-state'>جاري التحميل...</div>";
 
         const res = await fetch(`/api/get-messages?phone=${phone}`);
         const data = await res.json();
 
         if (!data.success || !data.messages.length) {
           messagesBox.innerHTML =
-            "<div class='message incoming'>لا توجد رسائل</div>";
+            "<div class='empty-state'>لا توجد رسائل</div>";
           return;
         }
 
@@ -256,20 +794,37 @@
 
         if (!visibleMessages.length) {
           messagesBox.innerHTML =
-            "<div class='message incoming'>لا توجد رسائل</div>";
+            "<div class='empty-state'>لا توجد رسائل</div>";
           return;
         }
 
-        messagesBox.innerHTML = visibleMessages
-          .map(
-            (m) => `
-        <div class="message ${m.direction === "incoming" ? "incoming" : "outgoing"}">
-          ${m.message || ""}
-        </div>
-      `,
-          )
-          .join("");
+        let html = "";
+        let lastDay = null;
 
+        visibleMessages.forEach((m) => {
+          const day = formatDay(m);
+          if (day && day !== lastDay) {
+            html += `<div class="day-divider">${day}</div>`;
+            lastDay = day;
+          }
+
+          const time = formatTime(m);
+          const dir = m.direction === "incoming" ? "incoming" : "outgoing";
+
+          html += `
+            <div class="message-row ${dir}">
+              <div class="message">
+                <span class="bubble-text">${escapeHtml(m.message || "")}</span>
+                <span class="bubble-meta">
+                  ${time ? `<span>${time}</span>` : ""}
+                  ${tickIcon(m)}
+                </span>
+              </div>
+            </div>
+          `;
+        });
+
+        messagesBox.innerHTML = html;
         messagesBox.scrollTop = messagesBox.scrollHeight;
       }
 
@@ -279,30 +834,37 @@
         const input = document.getElementById("replyText");
         const replyText = input.value.trim();
 
-        if (!replyText) return alert("اكتب رسالة أولاً");
+        if (!replyText) return;
 
-        const res = await fetch("/api/send-reply", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            to: selectedPhone,
-            message: replyText,
-          }),
-        });
+        const sendBtn = document.getElementById("sendBtn");
+        sendBtn.disabled = true;
 
-        const data = await res.json();
+        try {
+          const res = await fetch("/api/send-reply", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: selectedPhone,
+              message: replyText,
+            }),
+          });
 
-        if (!data.success) {
-          alert("فشل إرسال الرسالة: " + (data.error || ""));
-          console.log(data);
-          return;
+          const data = await res.json();
+
+          if (!data.success) {
+            alert("فشل إرسال الرسالة: " + (data.error || ""));
+            console.log(data);
+            return;
+          }
+
+          input.value = "";
+          openChat(selectedPhone);
+          loadConversations();
+        } finally {
+          sendBtn.disabled = false;
         }
-
-        input.value = "";
-        openChat(selectedPhone);
-        loadConversations();
       }
 
       loadConversations();
