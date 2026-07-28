@@ -716,6 +716,9 @@
       </section>
     </div>
 
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+
     <script>
       let selectedPhone = null;
       let allConversations = [];
@@ -1270,15 +1273,74 @@ let voiceRecorder = null;
 let voiceStream = null;
 let voiceChunks = [];
 
+let browserFfmpeg = null;
+let browserFfmpegLoading = null;
+
+async function convertVoiceForWhatsApp(webmBlob) {
+  if (!browserFfmpeg) {
+    browserFfmpeg = new FFmpegWASM.FFmpeg();
+  }
+
+  if (!browserFfmpegLoading) {
+    browserFfmpegLoading = (async () => {
+      const { toBlobURL } = FFmpegUtil;
+
+      await browserFfmpeg.load({
+        coreURL: await toBlobURL(
+          "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js",
+          "text/javascript",
+        ),
+        wasmURL: await toBlobURL(
+          "https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm",
+          "application/wasm",
+        ),
+      });
+    })();
+  }
+
+  await browserFfmpegLoading;
+
+  const id = Date.now();
+  const inputName = `voice-${id}.webm`;
+  const outputName = `voice-${id}.ogg`;
+
+  await browserFfmpeg.writeFile(
+    inputName,
+    new Uint8Array(await webmBlob.arrayBuffer()),
+  );
+
+  await browserFfmpeg.exec([
+    "-i",
+    inputName,
+    "-vn",
+    "-ac",
+    "1",
+    "-c:a",
+    "libopus",
+    "-b:a",
+    "32k",
+    outputName,
+  ]);
+
+  const output = await browserFfmpeg.readFile(outputName);
+
+  await browserFfmpeg.deleteFile(inputName).catch(() => {});
+  await browserFfmpeg.deleteFile(outputName).catch(() => {});
+
+  return new File(
+    [output],
+    outputName,
+    { type: "audio/ogg; codecs=opus" },
+  );
+}
 async function toggleVoiceRecording() {
   const voiceBtn = document.getElementById("voiceBtn");
 
-  // إذا كان التسجيل قائمًا: أوقفه وأرسل التسجيل
   if (voiceRecorder && voiceRecorder.state === "recording") {
     voiceRecorder.stop();
-    voiceBtn.textContent = "🎤";
+    voiceBtn.textContent = "⌛";
     voiceBtn.style.color = "";
-    voiceBtn.title = "تسجيل رسالة صوتية";
+    voiceBtn.title = "جاري تجهيز الرسالة الصوتية...";
     return;
   }
 
@@ -1291,7 +1353,7 @@ async function toggleVoiceRecording() {
     const voiceMimeType = "audio/webm;codecs=opus";
 
     if (!MediaRecorder.isTypeSupported(voiceMimeType)) {
-      alert("متصفحك لا يدعم تسجيل الصوت بصيغة واتساب. جرّب Google Chrome أو أرسل ملفًا صوتيًا من زر المشبك.");
+      alert("متصفحك لا يدعم تسجيل الصوت");
       return;
     }
 
@@ -1306,41 +1368,44 @@ async function toggleVoiceRecording() {
     });
 
     voiceRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        voiceChunks.push(event.data);
-      }
+      if (event.data.size > 0) voiceChunks.push(event.data);
     };
 
     voiceRecorder.onstop = async () => {
+      const messageInput = document.getElementById("replyText");
+      const originalPlaceholder = messageInput.placeholder;
+
       try {
         const voiceBlob = new Blob(voiceChunks, {
           type: voiceMimeType,
         });
-
-        const maxSize = 3 * 1024 * 1024;
 
         if (!voiceBlob.size) {
           alert("لم يتم تسجيل صوت");
           return;
         }
 
-        if (voiceBlob.size > maxSize) {
-          alert("الرسالة الصوتية كبيرة جدًا");
-          return;
-        }
+        messageInput.placeholder = "جاري تجهيز الرسالة الصوتية...";
+        voiceBtn.textContent = "⌛";
 
-        const voiceFile = new File(
-          [voiceBlob],
-          `voice-${Date.now()}.webm`,
-          { type: voiceMimeType },
-        );
+        // التحويل يحدث داخل Chrome وليس على Vercel
+        const voiceFile = await convertVoiceForWhatsApp(voiceBlob);
 
-        // نستخدم نفس دالة رفع وإرسال المرفقات الموجودة عندك
+        messageInput.placeholder = "جاري إرسال الرسالة الصوتية...";
+
         await sendMediaFile({
           files: [voiceFile],
           value: "",
         });
+      } catch (error) {
+        console.error("VOICE CONVERSION ERROR:", error);
+        alert("تعذر تجهيز الرسالة الصوتية. حاول مرة أخرى.");
       } finally {
+        messageInput.placeholder = originalPlaceholder;
+        voiceBtn.textContent = "🎤";
+        voiceBtn.style.color = "";
+        voiceBtn.title = "تسجيل رسالة صوتية";
+
         voiceStream?.getTracks().forEach((track) => track.stop());
         voiceStream = null;
         voiceRecorder = null;
@@ -1355,7 +1420,7 @@ async function toggleVoiceRecording() {
     voiceBtn.title = "إيقاف وإرسال التسجيل";
   } catch (error) {
     console.error("VOICE RECORDING ERROR:", error);
-    alert("يجب السماح للمتصفح باستخدام الميكروفون لتسجيل رسالة صوتية");
+    alert("يجب السماح للمتصفح باستخدام الميكروفون");
   }
 }
 
