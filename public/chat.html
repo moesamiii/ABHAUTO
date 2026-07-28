@@ -865,55 +865,80 @@
           ? tagMatch[1].toLowerCase()
           : (m.message_type || "").toLowerCase();
 
-        // Case 1: real media URL + it's an image
-        if (mediaUrl && (IMAGE_EXT.test(mediaUrl) || tag === "image")) {
+        // المستند له أولوية، حتى لو امتداده صورة مثل JPG أو PNG
+        if (mediaUrl && tag === "document") {
+          const name = m.filename || fileNameFromUrl(mediaUrl);
+
+          return `
+      <a href="${escapeHtml(mediaUrl)}" target="_blank" style="text-decoration:none;">
+        <div class="doc-chip">
+          <div class="doc-icon">${docIconSvg()}</div>
+          <div style="min-width:0;">
+            <div class="doc-name">${escapeHtml(name)}</div>
+            <div class="doc-sub">فتح المستند</div>
+          </div>
+        </div>
+      </a>
+    `;
+        }
+
+        // الصورة
+        if (mediaUrl && (tag === "image" || IMAGE_EXT.test(mediaUrl))) {
           const caption =
             tag === "image"
               ? ""
               : rawText && rawText !== mediaUrl
                 ? rawText
                 : "";
+
           return `
-            <img class="media-image" src="${escapeHtml(mediaUrl)}" alt="صورة" onclick="window.open('${escapeHtml(mediaUrl)}', '_blank')" />
-            ${caption ? `<div class="media-caption">${escapeHtml(caption)}</div>` : ""}
-          `;
+      <img class="media-image" src="${escapeHtml(mediaUrl)}" alt="صورة" onclick="window.open('${escapeHtml(mediaUrl)}', '_blank')" />
+      ${caption ? `<div class="media-caption">${escapeHtml(caption)}</div>` : ""}
+    `;
         }
 
-        // Case 2: real media URL + it's a document
-        if (mediaUrl && (DOC_EXT.test(mediaUrl) || tag === "document")) {
+        // الملفات المعتادة مثل PDF / Word
+        if (mediaUrl && DOC_EXT.test(mediaUrl)) {
           const name = m.filename || fileNameFromUrl(mediaUrl);
+
           return `
-            <a href="${escapeHtml(mediaUrl)}" target="_blank" style="text-decoration:none;">
-              <div class="doc-chip">
-                <div class="doc-icon">${docIconSvg()}</div>
-                <div style="min-width:0;">
-                  <div class="doc-name">${escapeHtml(name)}</div>
-                  <div class="doc-sub">فتح المستند</div>
-                </div>
-              </div>
-            </a>
-          `;
+      <a href="${escapeHtml(mediaUrl)}" target="_blank" style="text-decoration:none;">
+        <div class="doc-chip">
+          <div class="doc-icon">${docIconSvg()}</div>
+          <div style="min-width:0;">
+            <div class="doc-name">${escapeHtml(name)}</div>
+            <div class="doc-sub">فتح المستند</div>
+          </div>
+        </div>
+      </a>
+    `;
         }
 
-        // Case 3: real media URL + it's audio
+        // الصوت
         if (mediaUrl && tag === "audio") {
-          return `<audio controls src="${escapeHtml(mediaUrl)}" style="width: 240px; height: 40px;"></audio>`;
+          return `
+      <audio controls src="${escapeHtml(mediaUrl)}"
+        style="width:240px; height:40px;">
+      </audio>
+    `;
         }
 
-        // Case 4: real media URL + it's video
+        // الفيديو
         if (mediaUrl && tag === "video") {
-          return `<video controls src="${escapeHtml(mediaUrl)}" style="width: 100%; max-height: 320px; border-radius: 6px; display:block;"></video>`;
+          return `
+      <video controls src="${escapeHtml(mediaUrl)}"
+        style="width:100%; max-height:320px; border-radius:6px; display:block;">
+      </video>
+    `;
         }
 
-        // Case 5: a known tag but no URL available to actually play/show it
+        // نوع معروف لكن رابط الملف غير موجود
         if (tag && TAG_CHIPS[tag]) {
           return renderTagChip(tag, mediaUrl ? "" : "لا يوجد رابط متاح");
         }
 
-        // Default: plain text
         return `<span class="bubble-text">${escapeHtml(rawText)}</span>`;
       }
-
       function isMediaMessage(m) {
         const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
