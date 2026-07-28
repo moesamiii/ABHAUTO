@@ -1399,7 +1399,12 @@ async function toggleVoiceRecording() {
         });
       } catch (error) {
         console.error("VOICE CONVERSION ERROR:", error);
-        alert("تعذر تجهيز الرسالة الصوتية. حاول مرة أخرى.");
+       
+
+        alert(
+  "تعذر تجهيز الرسالة الصوتية: " +
+    (error?.message || "خطأ غير معروف"),
+);
       } finally {
         messageInput.placeholder = originalPlaceholder;
         voiceBtn.textContent = "🎤";
