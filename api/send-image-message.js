@@ -73,6 +73,7 @@ function buildMetaPayload(type, mediaId, caption, fileName) {
     },
   };
 }
+
 async function convertWebmToOgg(inputBuffer) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const inputPath = `/tmp/voice-${id}.webm`;
@@ -122,6 +123,7 @@ function previewForType(type, caption) {
   if (type === "image") return "📷 صورة";
   if (type === "video") return "🎥 فيديو";
   if (type === "audio") return "🎤 رسالة صوتية";
+
   return "📄 مستند";
 }
 
@@ -155,6 +157,7 @@ export default async function handler(req, res) {
     let finalMimeType = mimeType;
     let finalFileName = fileName || "";
 
+    // Chrome يسجل الصوت كـ WebM؛ نحوله إلى OGG/Opus المقبول من WhatsApp
     if (
       mediaType === "audio" &&
       mimeType.toLowerCase().startsWith("audio/webm")
@@ -171,7 +174,6 @@ export default async function handler(req, res) {
       "_",
     );
 
-    // نسخة دائمة في Supabase ليبقى الملف ظاهرًا في الشات لاحقًا
     const storagePath = `outgoing/${Date.now()}-${safeFileName}`;
 
     let mediaUrl = null;
@@ -193,12 +195,11 @@ export default async function handler(req, res) {
       mediaUrl = publicUrlData?.publicUrl || null;
     }
 
-    // رفع الملف إلى Meta للحصول على media ID
+    // رفع الملف إلى Meta
     const formData = new FormData();
     formData.append("messaging_product", "whatsapp");
     formData.append(
       "file",
-
       new Blob([uploadBuffer], { type: finalMimeType }),
       safeFileName,
     );
@@ -238,7 +239,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // إرسال نوع الملف الصحيح إلى واتساب
+    // إرسال نوع الملف الصحيح إلى WhatsApp
     const sendResponse = await fetch(
       `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
       {
