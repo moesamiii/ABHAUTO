@@ -1209,8 +1209,13 @@
   const messageInput = document.getElementById("replyText");
   const caption = messageInput.value.trim();
 
-  sendBtn.disabled = true;
-  sendBtn.title = "جاري رفع الملف...";
+  const originalButtonContent = sendBtn.innerHTML;
+const originalPlaceholder = messageInput.placeholder;
+
+sendBtn.disabled = true;
+sendBtn.innerHTML = `<span style="font-size:18px;">⌛</span>`;
+sendBtn.title = "جاري رفع وإرسال الملف...";
+messageInput.placeholder = "جاري إرسال الملف، الرجاء الانتظار...";
 
   try {
     const base64File = await new Promise((resolve, reject) => {
@@ -1254,7 +1259,9 @@
     alert("حدث خطأ أثناء إرسال الملف");
   } finally {
     sendBtn.disabled = false;
-    sendBtn.title = "إرسال";
+sendBtn.innerHTML = originalButtonContent;
+sendBtn.title = "إرسال";
+messageInput.placeholder = originalPlaceholder;
   }
 }
 
