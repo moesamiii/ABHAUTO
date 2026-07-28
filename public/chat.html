@@ -667,31 +667,50 @@
 
           <div class="messages" id="messages"></div>
 
-          <div class="reply-box">
-            <div class="reply-input-wrap">
-              <input
-                id="replyText"
-                placeholder="اكتب رسالة"
-                onkeydown="if (event.key === 'Enter') sendReply();"
-              />
-            </div>
-            <button
-              class="send-btn"
-              onclick="sendReply()"
-              id="sendBtn"
-              title="إرسال"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                style="transform: scaleX(-1)"
-              >
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
-              </svg>
-            </button>
-          </div>
+        <div class="reply-box">
+  <input
+    type="file"
+    id="mediaFile"
+    hidden
+    onchange="sendMediaFile(this)"
+  />
+
+  <button
+    class="back-btn"
+    onclick="document.getElementById('mediaFile').click()"
+    title="إرفاق صورة أو مستند"
+    type="button"
+    style="font-size: 23px;"
+  >
+    📎
+  </button>
+
+
+  <button
+  class="back-btn"
+  onclick="toggleVoiceRecording()"
+  id="voiceBtn"
+  title="تسجيل رسالة صوتية"
+  type="button"
+  style="font-size: 20px;"
+>
+  🎤
+</button>
+
+  <div class="reply-input-wrap">
+    <input
+      id="replyText"
+      placeholder="اكتب رسالة أو أرفق ملفًا"
+      onkeydown="if (event.key === 'Enter') sendReply();"
+    />
+  </div>
+
+  <button
+    class="send-btn"
+    onclick="sendReply()"
+    id="sendBtn"
+    title="إرسال"
+  >
         </div>
       </section>
     </div>
@@ -939,6 +958,7 @@
 
         return `<span class="bubble-text">${escapeHtml(rawText)}</span>`;
       }
+
       function isMediaMessage(m) {
         const rawText = cleanMessageText(m.message);
         const mediaUrl = getMediaUrl(m);
@@ -1162,6 +1182,173 @@
           sendBtn.disabled = false;
         }
       }
+
+      async function sendMediaFile(fileInput) {
+  const file = fileInput.files?.[0];
+
+  if (!file) return;
+
+  if (!selectedPhone) {
+    alert("اختر محادثة أولاً");
+    fileInput.value = "";
+    return;
+  }
+
+ 
+
+  const maxSize = 3 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    alert("حجم الملف كبير. الحد الأقصى 8 MB");
+    fileInput.value = "";
+    return;
+  }
+
+  const sendBtn = document.getElementById("sendBtn");
+  const messageInput = document.getElementById("replyText");
+  const caption = messageInput.value.trim();
+
+  sendBtn.disabled = true;
+  sendBtn.title = "جاري رفع الملف...";
+
+  try {
+    const base64File = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("تعذر قراءة الملف"));
+
+      reader.readAsDataURL(file);
+    });
+
+    const res = await fetch("/api/send-image-message", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        to: selectedPhone,
+        message: caption,
+        imageBase64: base64File,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert("فشل إرسال الملف: " + (data.error || ""));
+      console.log(data);
+      return;
+    }
+
+    messageInput.value = "";
+    fileInput.value = "";
+
+    await openChat(selectedPhone);
+    await loadConversations();
+  } catch (error) {
+    console.error("SEND MEDIA CLIENT ERROR:", error);
+    alert("حدث خطأ أثناء إرسال الملف");
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.title = "إرسال";
+  }
+}
+
+let voiceRecorder = null;
+let voiceStream = null;
+let voiceChunks = [];
+
+async function toggleVoiceRecording() {
+  const voiceBtn = document.getElementById("voiceBtn");
+
+  // إذا كان التسجيل قائمًا: أوقفه وأرسل التسجيل
+  if (voiceRecorder && voiceRecorder.state === "recording") {
+    voiceRecorder.stop();
+    voiceBtn.textContent = "🎤";
+    voiceBtn.style.color = "";
+    voiceBtn.title = "تسجيل رسالة صوتية";
+    return;
+  }
+
+  if (!selectedPhone) {
+    alert("اختر محادثة أولاً");
+    return;
+  }
+
+  try {
+    const voiceMimeType = "audio/ogg;codecs=opus";
+
+    if (!MediaRecorder.isTypeSupported(voiceMimeType)) {
+      alert("متصفحك لا يدعم تسجيل الصوت بصيغة واتساب. جرّب Google Chrome أو أرسل ملفًا صوتيًا من زر المشبك.");
+      return;
+    }
+
+    voiceStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+
+    voiceChunks = [];
+
+    voiceRecorder = new MediaRecorder(voiceStream, {
+      mimeType: voiceMimeType,
+    });
+
+    voiceRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        voiceChunks.push(event.data);
+      }
+    };
+
+    voiceRecorder.onstop = async () => {
+      try {
+        const voiceBlob = new Blob(voiceChunks, {
+          type: voiceMimeType,
+        });
+
+        const maxSize = 3 * 1024 * 1024;
+
+        if (!voiceBlob.size) {
+          alert("لم يتم تسجيل صوت");
+          return;
+        }
+
+        if (voiceBlob.size > maxSize) {
+          alert("الرسالة الصوتية كبيرة جدًا");
+          return;
+        }
+
+        const voiceFile = new File(
+          [voiceBlob],
+          `voice-${Date.now()}.ogg`,
+          { type: voiceMimeType },
+        );
+
+        // نستخدم نفس دالة رفع وإرسال المرفقات الموجودة عندك
+        await sendMediaFile({
+          files: [voiceFile],
+          value: "",
+        });
+      } finally {
+        voiceStream?.getTracks().forEach((track) => track.stop());
+        voiceStream = null;
+        voiceRecorder = null;
+        voiceChunks = [];
+      }
+    };
+
+    voiceRecorder.start();
+
+    voiceBtn.textContent = "⏹";
+    voiceBtn.style.color = "#e74c3c";
+    voiceBtn.title = "إيقاف وإرسال التسجيل";
+  } catch (error) {
+    console.error("VOICE RECORDING ERROR:", error);
+    alert("يجب السماح للمتصفح باستخدام الميكروفون لتسجيل رسالة صوتية");
+  }
+}
 
       loadConversations();
       setInterval(loadConversations, 5000);

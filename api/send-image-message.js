@@ -1,16 +1,82 @@
 import { createClient } from "@supabase/supabase-js";
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "4mb",
+    },
+  },
+};
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
+
+const MEDIA_BUCKET = "whatsapp-media";
 
 function cleanPhone(phone) {
   return String(phone || "").replace(/\D/g, "");
 }
 
 function getMetaError(data) {
-  return data?.error?.message || "WhatsApp rejected the image message";
+  return data?.error?.message || "WhatsApp rejected the media message";
+}
+
+function getMediaType(mimeType = "") {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+
+  return "document";
+}
+
+function getExtension(mimeType = "", fileName = "") {
+  if (fileName.includes(".")) {
+    return fileName.split(".").pop().toLowerCase();
+  }
+
+  return mimeType.split("/")[1]?.split(";")[0] || "bin";
+}
+
+function buildMetaPayload(type, mediaId, caption, fileName) {
+  if (type === "image") {
+    return {
+      type: "image",
+      image: { id: mediaId, caption: caption || "" },
+    };
+  }
+
+  if (type === "video") {
+    return {
+      type: "video",
+      video: { id: mediaId, caption: caption || "" },
+    };
+  }
+
+  if (type === "audio") {
+    return {
+      type: "audio",
+      audio: { id: mediaId },
+    };
+  }
+
+  return {
+    type: "document",
+    document: {
+      id: mediaId,
+      caption: caption || "",
+      filename: fileName || "document",
+    },
+  };
+}
+
+function previewForType(type, caption) {
+  if (caption) return caption;
+  if (type === "image") return "📷 صورة";
+  if (type === "video") return "🎥 فيديو";
+  if (type === "audio") return "🎤 رسالة صوتية";
+  return "📄 مستند";
 }
 
 export default async function handler(req, res) {
@@ -28,41 +94,52 @@ export default async function handler(req, res) {
       return res.status(400).json({
         success: false,
         step: "validation",
-        error: "Missing phone or image",
+        error: "Missing phone, file, or file type",
       });
     }
 
-    const base64Data = imageBase64.split(",")[1];
-    const imageBuffer = Buffer.from(base64Data, "base64");
+    const base64Data = imageBase64.includes(",")
+      ? imageBase64.split(",")[1]
+      : imageBase64;
 
-    // NEW: keep our own permanent copy of the image so the dashboard
-    // can display it later — Meta's media IDs aren't retrievable this way.
-    const ext = (mimeType.split("/")[1] || "jpg").split(";")[0];
-    const storagePath = `outgoing/${Date.now()}-${(fileName || "image").replace(/[^a-zA-Z0-9._-]/g, "_")}.${ext}`;
+    const fileBuffer = Buffer.from(base64Data, "base64");
+    const mediaType = getMediaType(mimeType);
+    const extension = getExtension(mimeType, fileName || "");
+
+    const safeFileName = (fileName || `file.${extension}`).replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_",
+    );
+
+    // نسخة دائمة في Supabase ليبقى الملف ظاهرًا في الشات لاحقًا
+    const storagePath = `outgoing/${Date.now()}-${safeFileName}`;
 
     let mediaUrl = null;
+
     const { error: storageError } = await supabase.storage
-      .from("whatsapp-media")
-      .upload(storagePath, imageBuffer, {
+      .from(MEDIA_BUCKET)
+      .upload(storagePath, fileBuffer, {
         contentType: mimeType,
-        upsert: true,
+        upsert: false,
       });
 
     if (storageError) {
       console.error("OUTGOING MEDIA STORAGE ERROR:", storageError);
     } else {
       const { data: publicUrlData } = supabase.storage
-        .from("whatsapp-media")
+        .from(MEDIA_BUCKET)
         .getPublicUrl(storagePath);
+
       mediaUrl = publicUrlData?.publicUrl || null;
     }
 
+    // رفع الملف إلى Meta للحصول على media ID
     const formData = new FormData();
     formData.append("messaging_product", "whatsapp");
     formData.append(
       "file",
-      new Blob([imageBuffer], { type: mimeType }),
-      fileName || "image.jpg",
+      new Blob([fileBuffer], { type: mimeType }),
+      safeFileName,
     );
 
     const uploadResponse = await fetch(
@@ -87,7 +164,7 @@ export default async function handler(req, res) {
         phone,
         direction: "outgoing",
         message_type: "system",
-        message: `Image upload failed: ${errorMessage}`,
+        message: `Media upload failed: ${errorMessage}`,
         status: "failed",
         error_message: errorMessage,
         error_code: errorCode,
@@ -95,14 +172,12 @@ export default async function handler(req, res) {
 
       return res.status(400).json({
         success: false,
-        step: "upload_image",
+        step: "upload_media",
         error: errorMessage,
-        meta: uploadData,
       });
     }
 
-    const mediaId = uploadData.id;
-
+    // إرسال نوع الملف الصحيح إلى واتساب
     const sendResponse = await fetch(
       `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
       {
@@ -114,11 +189,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           messaging_product: "whatsapp",
           to: phone,
-          type: "image",
-          image: {
-            id: mediaId,
-            caption: message || "",
-          },
+          ...buildMetaPayload(mediaType, uploadData.id, message, safeFileName),
         }),
       },
     );
@@ -134,7 +205,7 @@ export default async function handler(req, res) {
         phone,
         direction: "outgoing",
         message_type: "system",
-        message: `Image send failed: ${errorMessage}`,
+        message: `Media send failed: ${errorMessage}`,
         status: "failed",
         error_message: errorMessage,
         error_code: errorCode,
@@ -142,9 +213,8 @@ export default async function handler(req, res) {
 
       return res.status(400).json({
         success: false,
-        step: "send_image",
+        step: "send_media",
         error: errorMessage,
-        meta: sendData,
       });
     }
 
@@ -152,8 +222,8 @@ export default async function handler(req, res) {
       wa_message_id: sendData.messages?.[0]?.id || null,
       phone,
       direction: "outgoing",
-      message_type: "image",
-      message: message || "Image sent",
+      message_type: mediaType,
+      message: message || `[${mediaType}]`,
       media_url: mediaUrl,
       status: "accepted",
     });
@@ -161,7 +231,7 @@ export default async function handler(req, res) {
     await supabase.from("conversations").upsert(
       {
         phone,
-        last_message: message || "📷 صورة",
+        last_message: previewForType(mediaType, message),
         last_message_at: new Date().toISOString(),
       },
       { onConflict: "phone" },
@@ -169,12 +239,13 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      media_id: mediaId,
+      type: mediaType,
       media_url: mediaUrl,
       data: sendData,
     });
   } catch (error) {
-    console.error("SEND IMAGE ERROR:", error);
+    console.error("SEND MEDIA ERROR:", error);
+
     return res.status(500).json({
       success: false,
       step: "server_error",
