@@ -1,4 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import ffmpegPath from "ffmpeg-static";
+import { spawn } from "child_process";
+import { readFile, unlink, writeFile } from "fs/promises";
 
 export const config = {
   api: {
@@ -70,6 +73,49 @@ function buildMetaPayload(type, mediaId, caption, fileName) {
     },
   };
 }
+async function convertWebmToOgg(inputBuffer) {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const inputPath = `/tmp/voice-${id}.webm`;
+  const outputPath = `/tmp/voice-${id}.ogg`;
+
+  try {
+    await writeFile(inputPath, inputBuffer);
+
+    await new Promise((resolve, reject) => {
+      const ffmpeg = spawn(ffmpegPath, [
+        "-y",
+        "-i",
+        inputPath,
+        "-vn",
+        "-ac",
+        "1",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        "32k",
+        outputPath,
+      ]);
+
+      let errorText = "";
+
+      ffmpeg.stderr.on("data", (data) => {
+        errorText += data.toString();
+      });
+
+      ffmpeg.on("error", reject);
+
+      ffmpeg.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Audio conversion failed: ${errorText}`));
+      });
+    });
+
+    return await readFile(outputPath);
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+  }
+}
 
 function previewForType(type, caption) {
   if (caption) return caption;
@@ -102,11 +148,25 @@ export default async function handler(req, res) {
       ? imageBase64.split(",")[1]
       : imageBase64;
 
-    const fileBuffer = Buffer.from(base64Data, "base64");
+    const originalBuffer = Buffer.from(base64Data, "base64");
     const mediaType = getMediaType(mimeType);
-    const extension = getExtension(mimeType, fileName || "");
 
-    const safeFileName = (fileName || `file.${extension}`).replace(
+    let uploadBuffer = originalBuffer;
+    let finalMimeType = mimeType;
+    let finalFileName = fileName || "";
+
+    if (
+      mediaType === "audio" &&
+      mimeType.toLowerCase().startsWith("audio/webm")
+    ) {
+      uploadBuffer = await convertWebmToOgg(originalBuffer);
+      finalMimeType = "audio/ogg; codecs=opus";
+      finalFileName = `voice-${Date.now()}.ogg`;
+    }
+
+    const extension = getExtension(finalMimeType, finalFileName);
+
+    const safeFileName = (finalFileName || `file.${extension}`).replace(
       /[^a-zA-Z0-9._-]/g,
       "_",
     );
@@ -118,8 +178,8 @@ export default async function handler(req, res) {
 
     const { error: storageError } = await supabase.storage
       .from(MEDIA_BUCKET)
-      .upload(storagePath, fileBuffer, {
-        contentType: mimeType,
+      .upload(storagePath, uploadBuffer, {
+        contentType: finalMimeType,
         upsert: false,
       });
 
@@ -138,7 +198,8 @@ export default async function handler(req, res) {
     formData.append("messaging_product", "whatsapp");
     formData.append(
       "file",
-      new Blob([fileBuffer], { type: mimeType }),
+
+      new Blob([uploadBuffer], { type: finalMimeType }),
       safeFileName,
     );
 

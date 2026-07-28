@@ -1265,6 +1265,7 @@ messageInput.placeholder = originalPlaceholder;
   }
 }
 
+
 let voiceRecorder = null;
 let voiceStream = null;
 let voiceChunks = [];
@@ -1287,7 +1288,7 @@ async function toggleVoiceRecording() {
   }
 
   try {
-    const voiceMimeType = "audio/ogg;codecs=opus";
+    const voiceMimeType = "audio/webm;codecs=opus";
 
     if (!MediaRecorder.isTypeSupported(voiceMimeType)) {
       alert("متصفحك لا يدعم تسجيل الصوت بصيغة واتساب. جرّب Google Chrome أو أرسل ملفًا صوتيًا من زر المشبك.");
@@ -1330,7 +1331,7 @@ async function toggleVoiceRecording() {
 
         const voiceFile = new File(
           [voiceBlob],
-          `voice-${Date.now()}.ogg`,
+          `voice-${Date.now()}.webm`,
           { type: voiceMimeType },
         );
 
