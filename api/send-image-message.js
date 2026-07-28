@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import ffmpegPath from "ffmpeg-static";
+import { chmodSync } from "fs";
 import { spawn } from "child_process";
 import { readFile, unlink, writeFile } from "fs/promises";
 
@@ -78,7 +79,11 @@ async function convertWebmToOgg(inputBuffer) {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const inputPath = `/tmp/voice-${id}.webm`;
   const outputPath = `/tmp/voice-${id}.ogg`;
-
+  try {
+    chmodSync(ffmpegPath, 0o755);
+  } catch (e) {
+    console.error("chmod failed:", e);
+  }
   try {
     await writeFile(inputPath, inputBuffer);
 
