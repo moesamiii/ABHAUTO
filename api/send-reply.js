@@ -13,6 +13,25 @@ function getMetaError(data) {
   return data?.error?.message || "WhatsApp API error";
 }
 
+// يستخدم رقم Coexistence الجديد بعد ربطه.
+// وإذا لم يُربط بعد، يبقى الداشبورد قادرًا على استخدام الإعداد القديم.
+async function getWhatsAppConnection() {
+  const { data, error } = await supabase
+    .from("whatsapp_connections")
+    .select("phone_number_id, access_token")
+    .eq("id", "abh")
+    .maybeSingle();
+
+  if (error) {
+    console.error("WHATSAPP CONNECTION LOOKUP ERROR:", error);
+  }
+
+  return {
+    phoneNumberId: data?.phone_number_id || process.env.PHONE_NUMBER_ID,
+    accessToken: data?.access_token || process.env.WHATSAPP_TOKEN,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res
@@ -32,13 +51,19 @@ export default async function handler(req, res) {
       });
     }
 
+    const { phoneNumberId, accessToken } = await getWhatsAppConnection();
+
+    if (!phoneNumberId || !accessToken) {
+      throw new Error("No active WhatsApp connection found");
+    }
+
     const response = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
@@ -70,7 +95,6 @@ export default async function handler(req, res) {
         success: false,
         step: "send_text",
         error: errorMessage,
-        meta: data,
       });
     }
 
@@ -99,6 +123,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("SEND REPLY ERROR:", error);
+
     return res.status(500).json({
       success: false,
       step: "server_error",

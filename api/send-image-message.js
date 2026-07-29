@@ -1,8 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import ffmpegPath from "ffmpeg-static";
-
-import { spawn } from "child_process";
-import { readFile, unlink, writeFile } from "fs/promises";
 
 export const config = {
   api: {
@@ -25,6 +21,25 @@ function cleanPhone(phone) {
 
 function getMetaError(data) {
   return data?.error?.message || "WhatsApp rejected the media message";
+}
+
+// يستخدم بيانات Coexistence الجديدة بعد الربط.
+// ويبقي الإعداد القديم كـ fallback إلى أن يكتمل الربط.
+async function getWhatsAppConnection() {
+  const { data, error } = await supabase
+    .from("whatsapp_connections")
+    .select("phone_number_id, access_token")
+    .eq("id", "abh")
+    .maybeSingle();
+
+  if (error) {
+    console.error("WHATSAPP CONNECTION LOOKUP ERROR:", error);
+  }
+
+  return {
+    phoneNumberId: data?.phone_number_id || process.env.PHONE_NUMBER_ID,
+    accessToken: data?.access_token || process.env.WHATSAPP_TOKEN,
+  };
 }
 
 function getMediaType(mimeType = "") {
@@ -75,50 +90,6 @@ function buildMetaPayload(type, mediaId, caption, fileName) {
   };
 }
 
-async function convertWebmToOgg(inputBuffer) {
-  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const inputPath = `/tmp/voice-${id}.webm`;
-  const outputPath = `/tmp/voice-${id}.ogg`;
-
-  try {
-    await writeFile(inputPath, inputBuffer);
-
-    await new Promise((resolve, reject) => {
-      const ffmpeg = spawn(ffmpegPath, [
-        "-y",
-        "-i",
-        inputPath,
-        "-vn",
-        "-ac",
-        "1",
-        "-c:a",
-        "libopus",
-        "-b:a",
-        "32k",
-        outputPath,
-      ]);
-
-      let errorText = "";
-
-      ffmpeg.stderr.on("data", (data) => {
-        errorText += data.toString();
-      });
-
-      ffmpeg.on("error", reject);
-
-      ffmpeg.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`Audio conversion failed: ${errorText}`));
-      });
-    });
-
-    return await readFile(outputPath);
-  } finally {
-    await unlink(inputPath).catch(() => {});
-    await unlink(outputPath).catch(() => {});
-  }
-}
-
 function previewForType(type, caption) {
   if (caption) return caption;
   if (type === "image") return "📷 صورة";
@@ -151,26 +122,11 @@ export default async function handler(req, res) {
       ? imageBase64.split(",")[1]
       : imageBase64;
 
-    const originalBuffer = Buffer.from(base64Data, "base64");
+    const uploadBuffer = Buffer.from(base64Data, "base64");
     const mediaType = getMediaType(mimeType);
+    const extension = getExtension(mimeType, fileName || "");
 
-    let uploadBuffer = originalBuffer;
-    let finalMimeType = mimeType;
-    let finalFileName = fileName || "";
-
-    // Chrome يسجل الصوت كـ WebM؛ نحوله إلى OGG/Opus المقبول من WhatsApp
-    if (
-      mediaType === "audio" &&
-      mimeType.toLowerCase().startsWith("audio/webm")
-    ) {
-      uploadBuffer = await convertWebmToOgg(originalBuffer);
-      finalMimeType = "audio/ogg; codecs=opus";
-      finalFileName = `voice-${Date.now()}.ogg`;
-    }
-
-    const extension = getExtension(finalMimeType, finalFileName);
-
-    const safeFileName = (finalFileName || `file.${extension}`).replace(
+    const safeFileName = (fileName || `file.${extension}`).replace(
       /[^a-zA-Z0-9._-]/g,
       "_",
     );
@@ -182,7 +138,7 @@ export default async function handler(req, res) {
     const { error: storageError } = await supabase.storage
       .from(MEDIA_BUCKET)
       .upload(storagePath, uploadBuffer, {
-        contentType: finalMimeType,
+        contentType: mimeType,
         upsert: false,
       });
 
@@ -196,21 +152,26 @@ export default async function handler(req, res) {
       mediaUrl = publicUrlData?.publicUrl || null;
     }
 
-    // رفع الملف إلى Meta
+    const { phoneNumberId, accessToken } = await getWhatsAppConnection();
+
+    if (!phoneNumberId || !accessToken) {
+      throw new Error("No active WhatsApp connection found");
+    }
+
     const formData = new FormData();
     formData.append("messaging_product", "whatsapp");
     formData.append(
       "file",
-      new Blob([uploadBuffer], { type: finalMimeType }),
+      new Blob([uploadBuffer], { type: mimeType }),
       safeFileName,
     );
 
     const uploadResponse = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/media`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/media`,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: formData,
       },
@@ -240,14 +201,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // إرسال نوع الملف الصحيح إلى WhatsApp
     const sendResponse = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/v25.0/${phoneNumberId}/messages`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           messaging_product: "whatsapp",
